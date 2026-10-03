@@ -1,0 +1,138 @@
+services:
+  postgres-auth:
+    image: postgres:16
+    container_name: pd-postgres-auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: auth_pass
+    ports:
+      - "5431:5432"
+    volumes:
+      - auth_data:/var/lib/postgresql/data
+
+  postgres-request:
+    image: postgres:16
+    container_name: pd-postgres-request
+    environment:
+      POSTGRES_DB: request_db
+      POSTGRES_USER: request
+      POSTGRES_PASSWORD: request_pass
+    ports:
+      - "5542:5432"
+    volumes:
+      - request_data:/var/lib/postgresql/data
+
+  postgres-expert:
+    image: postgres:16
+    container_name: pd-postgres-expert
+    environment:
+      POSTGRES_DB: expert_db
+      POSTGRES_USER: expert
+      POSTGRES_PASSWORD: expert_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - expert_data:/var/lib/postgresql/data
+
+  postgres-recovery:
+    image: postgres:16
+    container_name: pd-postgres-recovery
+    environment:
+      POSTGRES_DB: recovery_db
+      POSTGRES_USER: recovery
+      POSTGRES_PASSWORD: recovery_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - recovery_data:/var/lib/postgresql/data
+
+  postgres-chat:
+    image: postgres:16
+    container_name: pd-postgres-chat
+    environment:
+      POSTGRES_DB: chat_db
+      POSTGRES_USER: chat
+      POSTGRES_PASSWORD: chat_pass
+    ports:
+      - "5435:5432"
+    volumes:
+      - chat_data:/var/lib/postgresql/data
+
+  postgres-payment:
+    image: postgres:16
+    container_name: pd-postgres-payment
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment
+      POSTGRES_PASSWORD: payment_pass
+    ports:
+      - "5436:5432"
+    volumes:
+      - payment_data:/var/lib/postgresql/data
+
+  postgres-notification:
+    image: postgres:16
+    container_name: pd-postgres-notification
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: notification_pass
+    ports:
+      - "5437:5432"
+    volumes:
+      - notification_data:/var/lib/postgresql/data
+
+  postgres-analytics:
+    image: postgres:16
+    container_name: pd-postgres-analytics
+    environment:
+      POSTGRES_DB: analytics_db
+      POSTGRES_USER: analytics
+      POSTGRES_PASSWORD: analytics_pass
+    ports:
+      - "5438:5432"
+    volumes:
+      - analytics_data:/var/lib/postgresql/data
+
+  postgres-admin:
+    image: postgres:16
+    container_name: pd-postgres-admin
+    environment:
+      POSTGRES_DB: admin_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin_pass
+    ports:
+      - "5439:5432"
+    volumes:
+      - admin_data:/var/lib/postgresql/data
+
+  postgres-satellite:
+    image: postgres:16
+    container_name: pd-postgres-satellite
+    environment:
+      POSTGRES_DB: satellite_db
+      POSTGRES_USER: satellite
+      POSTGRES_PASSWORD: satellite_pass
+    ports:
+      - "5440:5432"
+    volumes:
+      - satellite_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: pd-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  auth_data:
+  request_data:
+  expert_data:
+  recovery_data:
+  chat_data:
+  payment_data:
+  notification_data:
+  analytics_data:
+  admin_data:
+  satellite_data:
