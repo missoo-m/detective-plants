@@ -1,15 +1,12 @@
-
 from enum import Enum
 from typing import Optional
 
 import strawberry
 
 from . import clients
-from .clients.base import NotFoundError
+from .errors import NotFoundError
 
-
-#  типы enum
-
+# типы enum
 @strawberry.enum
 class Role(Enum):
     CLIENT = "CLIENT"
@@ -185,7 +182,7 @@ class Request:
         try:
             return to_diagnosis(clients.expert_client.get_diagnosis_by_request(self.id))
         except NotFoundError:
-            return None  
+            return None   
 
 
 @strawberry.type
@@ -364,6 +361,112 @@ class SatelliteField:
         return [to_alert(a) for a in clients.satellite_client.list_alerts(self.id)]
 
 
+@strawberry.type
+class VideoRoom:
+    id: strawberry.ID
+    room_url: str
+    status: str
+    created_at: str
+
+
+@strawberry.type
+class AuthPayload:
+    token: str
+    user: User
+
+
+@strawberry.type
+class CountItem:
+    key: str
+    count: int
+
+
+@strawberry.type
+class AmountItem:
+    key: str
+    amount: float
+
+
+@strawberry.type
+class UsersSummary:
+    total: int
+    by_role: list[CountItem]
+    by_status: list[CountItem]
+
+
+@strawberry.type
+class RequestsSummary:
+    total: int
+    by_status: list[CountItem]
+
+
+@strawberry.type
+class ResponsesSummary:
+    total: int
+    by_status: list[CountItem]
+
+
+@strawberry.type
+class TransactionsSummary:
+    count: int
+    total_amount: float
+    by_status: list[AmountItem]
+    by_type: list[AmountItem]
+
+
+@strawberry.type
+class ExpertBalance:
+    expert_id: strawberry.ID
+    earned: float
+    commission: float
+    withdrawn: float
+    pending: float
+    available: float
+
+
+@strawberry.type
+class TrackerProgress:
+    tracker_id: strawberry.ID
+    total_days: int
+    elapsed_days: int
+    percent: float
+    photos_count: int
+    updates_count: int
+
+
+@strawberry.type
+class NotificationsSummary:
+    total: int
+    unread: int
+    by_type: list[CountItem]
+
+
+@strawberry.type
+class ApplicationsSummary:
+    total: int
+    by_status: list[CountItem]
+
+
+@strawberry.type
+class NdviSummary:
+    field_id: strawberry.ID
+    count: int
+    min_value: float
+    max_value: float
+    avg_value: float
+    last_value: float
+    trend: float
+
+
+@strawberry.type
+class PlatformSummary:
+    experts: int
+    total_requests: int
+    completed_requests: int
+    completion_rate: float
+    avg_rating: float
+
+
 #  мапперы
 def to_profile(d: Optional[dict]) -> Optional[Profile]:
     if not d:
@@ -473,3 +576,80 @@ def to_alert(d: dict) -> SatelliteAlert:
 def to_field(d: dict) -> SatelliteField:
     return SatelliteField(id=d["id"], name=d["name"], geometry=d["geometry"],
                           created_at=d["created_at"], owner_id=d["owner_id"])
+
+
+def _counts(d: dict) -> list:
+    return [CountItem(key=str(k), count=v) for k, v in sorted(d.items())]
+
+
+def _amounts(d: dict) -> list:
+    return [AmountItem(key=str(k), amount=float(v)) for k, v in sorted(d.items())]
+
+
+def to_video_room(d: dict) -> VideoRoom:
+    return VideoRoom(id=d["id"], room_url=d["room_url"], status=d["status"], created_at=d["created_at"])
+
+
+def to_users_summary(d: dict) -> UsersSummary:
+    return UsersSummary(total=d["total"], by_role=_counts(d["by_role"]), by_status=_counts(d["by_status"]))
+
+
+def to_requests_summary(d: dict) -> RequestsSummary:
+    return RequestsSummary(total=d["total"], by_status=_counts(d["by_status"]))
+
+
+def to_responses_summary(d: dict) -> ResponsesSummary:
+    return ResponsesSummary(total=d["total"], by_status=_counts(d["by_status"]))
+
+
+def to_transactions_summary(d: dict) -> TransactionsSummary:
+    return TransactionsSummary(count=d["count"], total_amount=float(d["total_amount"]),
+                               by_status=_amounts(d["by_status"]), by_type=_amounts(d["by_type"]))
+
+
+def to_balance(d: dict) -> ExpertBalance:
+    return ExpertBalance(expert_id=d["expert_id"], earned=d["earned"], commission=d["commission"],
+                         withdrawn=d["withdrawn"], pending=d["pending"], available=d["available"])
+
+
+def to_progress(d: dict) -> TrackerProgress:
+    return TrackerProgress(tracker_id=d["tracker_id"], total_days=d["total_days"], elapsed_days=d["elapsed_days"],
+                           percent=d["percent"], photos_count=d["photos_count"], updates_count=d["updates_count"])
+
+
+def to_notifications_summary(d: dict) -> NotificationsSummary:
+    return NotificationsSummary(total=d["total"], unread=d["unread"], by_type=_counts(d["by_type"]))
+
+
+def to_applications_summary(d: dict) -> ApplicationsSummary:
+    return ApplicationsSummary(total=d["total"], by_status=_counts(d["by_status"]))
+
+
+def to_ndvi_summary(d: dict) -> NdviSummary:
+    return NdviSummary(field_id=d["field_id"], count=d["count"], min_value=d["min_value"], max_value=d["max_value"],
+                       avg_value=d["avg_value"], last_value=d["last_value"], trend=d["trend"])
+
+
+def to_platform_summary(d: dict) -> PlatformSummary:
+    return PlatformSummary(experts=d["experts"], total_requests=d["total_requests"],
+                           completed_requests=d["completed_requests"], completion_rate=d["completion_rate"],
+                           avg_rating=d["avg_rating"])
+
+
+def to_auth_payload(d: dict) -> AuthPayload:
+    return AuthPayload(token=d["token"], user=to_user(d["user"]))
+
+
+def to_photo(d: dict) -> RequestPhoto:
+    return RequestPhoto(id=d["id"], url=d["url"], uploaded_at=d["uploaded_at"])
+
+
+def to_step(d: dict) -> TreatmentStep:
+    return TreatmentStep(id=d["id"], step=d["step"], frequency=d.get("frequency"),
+                         duration_days=d.get("duration_days"))
+
+
+def to_history(h: dict) -> TreatmentHistory:
+    return TreatmentHistory(id=h["id"], record_type=HistoryRecordType(h["record_type"]), date=h["date"],
+                            photo_url=h.get("photo_url"), change_description=h.get("change_description"),
+                            author_id=h["author_id"])
