@@ -9,3 +9,10 @@ class NotificationDTO:
     message: str
     status: str
     created_at: str
+
+
+@dataclass
+class NotificationsSummaryDTO:
+    total: int
+    unread: int
+    by_type: dict

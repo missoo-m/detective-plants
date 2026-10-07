@@ -18,5 +18,5 @@ class Notification(Base):
     user_id = Column(Uuid(as_uuid=True), nullable=False)
     type = Column(String(50), nullable=False)
     message = Column(Text, nullable=False)
-    status = Column(String(20), nullable=False, default="UNREAD")     # UNREAD / READ
+    status = Column(String(20), nullable=False, default="UNREAD")     
     created_at = Column(DateTime, nullable=False, default=utcnow)

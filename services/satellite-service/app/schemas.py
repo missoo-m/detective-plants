@@ -25,3 +25,14 @@ class AlertDTO:
     type: str
     message: str
     created_at: str
+
+
+@dataclass
+class NdviSummaryDTO:
+    field_id: str
+    count: int
+    min_value: float
+    max_value: float
+    avg_value: float
+    last_value: float
+    trend: float            

@@ -27,3 +27,16 @@ class ValidationResult:
     valid: bool
     role: Optional[str] = None
     status: Optional[str] = None
+
+
+@dataclass
+class AuthResultDTO:
+    token: str
+    user: UserDTO
+
+
+@dataclass
+class UsersSummaryDTO:
+    total: int
+    by_role: dict
+    by_status: dict

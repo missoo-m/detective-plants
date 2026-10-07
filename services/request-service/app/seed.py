@@ -43,6 +43,12 @@ def seed(session_factory: Optional[Callable[[], Session]] = None) -> bool:
         req3 = Request(id=sid("req-3"), client_id=sid("user-4"), expert_id=None,
                        symptoms="Сохнут кончики листьев", ai_prediagnosis=None,
                        status="CREATED", created_at=datetime(2026, 1, 17, 9, 0))
-        session.add_all([req1, req2, req3])
+        req4 = Request(id=sid("req-4"), client_id=sid("user-4"), expert_id=sid("user-2"),
+                       symptoms="Скручивание молодых листьев", ai_prediagnosis=None,
+                       status="DONE", created_at=datetime(2026, 1, 5, 9, 0), completed_at=datetime(2026, 1, 12, 18, 0))
+        req5 = Request(id=sid("req-5"), client_id=sid("user-1"), expert_id=None,
+                       symptoms="Вялость растения после пересадки", ai_prediagnosis=None,
+                       status="CANCELLED", created_at=datetime(2026, 1, 3, 14, 0), completed_at=datetime(2026, 1, 3, 15, 0))
+        session.add_all([req1, req2, req3, req4, req5])
         session.commit()
         return True

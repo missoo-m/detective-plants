@@ -17,7 +17,7 @@ class Field(Base):
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id = Column(Uuid(as_uuid=True), nullable=False)       
     name = Column(String(100), nullable=False)
-    geometry = Column(Text, nullable=False)                     
+    geometry = Column(Text, nullable=False)                    
     created_at = Column(DateTime, nullable=False, default=utcnow)
 
     measurements = relationship("NdviMeasurement", back_populates="field",
@@ -42,7 +42,7 @@ class SatelliteAlert(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     field_id = Column(Uuid(as_uuid=True), ForeignKey("fields.id"), nullable=False)
-    type = Column(String(50), nullable=False)                   
+    type = Column(String(50), nullable=False)                   # NDVI_DROP / WEATHER / DISEASE_RISK
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False, default=utcnow)
 

@@ -19,7 +19,7 @@ services:
       POSTGRES_USER: request
       POSTGRES_PASSWORD: request_pass
     ports:
-      - "5542:5432"
+      - "5432:5432"
     volumes:
       - request_data:/var/lib/postgresql/data
 
@@ -119,6 +119,7 @@ services:
     volumes:
       - satellite_data:/var/lib/postgresql/data
 
+  # Зарезервирован под кэш/сессии в следующих лабораторных работах
   redis:
     image: redis:7
     container_name: pd-redis

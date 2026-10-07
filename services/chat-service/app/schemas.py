@@ -40,3 +40,10 @@ class ModerationRuleDTO:
     name: str
     pattern: str
     action: str
+
+
+@dataclass
+class ModerationResultDTO:
+    allowed: bool
+    action: Optional[str] = None
+    rule_name: Optional[str] = None
