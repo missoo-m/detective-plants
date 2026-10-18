@@ -1,4 +1,3 @@
-#Input-типы GraphQL
 from enum import Enum
 from typing import Optional
 
@@ -61,8 +60,8 @@ class TransactionSortInput:
 @strawberry.input
 class RequestFilterInput:
     statuses: Optional[list[RequestStatus]] = None
-    search: Optional[str] = None               
-    created_from: Optional[str] = None          
+    search: Optional[str] = None                 # поиск по описанию симптомов
+    created_from: Optional[str] = None           
     created_to: Optional[str] = None
     has_expert: Optional[bool] = None
 
@@ -71,7 +70,7 @@ class RequestFilterInput:
 class UserFilterInput:
     role: Optional[Role] = None
     status: Optional[UserStatus] = None
-    search: Optional[str] = None                 
+    search: Optional[str] = None                 # по имени или email
 
 
 @strawberry.input
@@ -100,7 +99,7 @@ class ApplicationFilterInput:
     submitted_to: Optional[str] = None
 
 
-#  бизнес-операции
+# бизнес-операции
 @strawberry.input
 class RegisterInput:
     email: str

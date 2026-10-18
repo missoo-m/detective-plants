@@ -53,6 +53,13 @@ class MockRequestClient(RequestClientBase):
         from .. import clients
         return clients
 
+    def _authorize(self, user_id: str, role: str, actor_role: Optional[str]) -> None:
+        #Роль приходит от Gateway после проверки JWT и сессии
+        if actor_role is None:
+            self._require_active(user_id, role)
+        elif actor_role != role:
+            raise PermissionDeniedError(f"Действие доступно только роли {role}")
+
     def _require_active(self, user_id: str, role: str) -> None:
         user = self._registry().auth_client.get_user(user_id)
         if user["status"] != "ACTIVE":
@@ -112,7 +119,7 @@ class MockRequestClient(RequestClientBase):
             raise NotFoundError(f"Болезнь {disease_id} не найдена")
         return disease
 
-    def create_request(self, client_id: str, symptoms: str, photo_urls: list) -> dict:
+    def create_request(self, client_id: str, symptoms: str, photo_urls: list, actor_role: Optional[str] = None) -> dict:
         symptoms = (symptoms or "").strip()
         if not 10 <= len(symptoms) <= 2000:
             raise ValidationError("Описание симптомов должно содержать от 10 до 2000 символов")
@@ -120,7 +127,7 @@ class MockRequestClient(RequestClientBase):
             raise ValidationError(f"К заявке можно прикрепить не более {MAX_PHOTOS} фото")
         if any(not u.startswith(("http://", "https://")) for u in photo_urls):
             raise ValidationError("Ссылка на фото должна начинаться с http:// или https://")
-        self._require_active(client_id, "CLIENT")
+        self._authorize(client_id, "CLIENT", actor_role)
         active = [r for r in self.requests.values() if r["client_id"] == client_id and r["status"] in ACTIVE_STATUSES]
         if len(active) >= MAX_ACTIVE:
             raise BusinessRuleError(f"Нельзя иметь более {MAX_ACTIVE} активных заявок одновременно")

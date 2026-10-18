@@ -22,3 +22,7 @@ class PermissionDeniedError(DomainError):
 
 class BusinessRuleError(DomainError):
     code = "BUSINESS_RULE_VIOLATION"
+
+
+class AuthenticationError(DomainError):
+    code = "UNAUTHENTICATED"

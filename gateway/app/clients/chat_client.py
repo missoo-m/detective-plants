@@ -33,7 +33,7 @@ MOCK_RULES = [{"id": "rule-1", "name": "Контакты вне платформ
 
 
 class MockChatClient(ChatClientBase):
-    #Mock Chat Service
+    """Mock Chat Service: чаты, сообщения и видеокомнаты в памяти + правила сервиса. В ЛР6 заменим на gRPC."""
 
     def __init__(self):
         self.rooms = copy.deepcopy(MOCK_CHAT_ROOMS)
@@ -52,7 +52,6 @@ class MockChatClient(ChatClientBase):
             raise NotFoundError(f"Чат {chat_room_id} не найден")
         return room
 
-    # ---- чтение
     def get_chat_room(self, chat_room_id: str, viewer_id: Optional[str] = None) -> dict:
         room = self._room(chat_room_id)
         self._check_access(room, viewer_id)
@@ -84,7 +83,6 @@ class MockChatClient(ChatClientBase):
         return sum(1 for m in self.messages if m["chat_room_id"] == chat_room_id
                    and not m["is_read"] and m["sender_id"] != user_id)
 
-    # ---- бизнес-операции
     def open_room(self, request_id: str, client_id: str, expert_id: str) -> dict:
         room = self.get_chat_room_by_request(request_id)
         if room is None:

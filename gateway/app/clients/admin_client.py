@@ -1,5 +1,6 @@
 import copy
 from typing import Optional
+
 from ..errors import BusinessRuleError, NotFoundError, PermissionDeniedError, ValidationError
 from .base import AdminClientBase
 from .common import check_period, count_by, lower_bound, new_id, now_iso, parse_iso, upper_bound
@@ -13,7 +14,7 @@ MOCK_EXPERT_APPLICATIONS = {
 
 
 class MockAdminClient(AdminClientBase):
-    #Mock Admin Service
+    """Mock Admin Service: заявки экспертов в памяти + правила сервиса. В ЛР6 заменим на gRPC."""
 
     def __init__(self):
         self.applications = copy.deepcopy(MOCK_EXPERT_APPLICATIONS)
@@ -23,7 +24,11 @@ class MockAdminClient(AdminClientBase):
         from .. import clients
         return clients.auth_client
 
-    def _require_admin(self, admin_id: str) -> None:
+    def _require_admin(self, admin_id: str, actor_role: Optional[str] = None) -> None:
+        if actor_role is not None:                      # роль уже проверена Gateway (JWT и сессия)
+            if actor_role != "ADMIN":
+                raise PermissionDeniedError("Действие доступно только администратору")
+            return
         user = self._auth().get_user(admin_id)
         if user["status"] != "ACTIVE" or user["role"] != "ADMIN":
             raise PermissionDeniedError("Действие доступно только администратору")
@@ -46,14 +51,16 @@ class MockAdminClient(AdminClientBase):
         items = list(self.applications.values())
         return {"total": len(items), "by_status": count_by(items, "status")}
 
-    def submit_application(self, user_id: str, documents_url: str) -> dict:
+    def submit_application(self, user_id: str, documents_url: str, actor_role: Optional[str] = None) -> dict:
         url = (documents_url or "").strip()
         if not url.startswith(("http://", "https://")) or len(url) > 500:
             raise ValidationError("documents_url должен быть ссылкой http(s) длиной до 500 символов")
-        user = self._auth().get_user(user_id)
-        if user["status"] != "ACTIVE":
-            raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
-        if user["role"] != "CLIENT":
+        if actor_role is None:
+            user = self._auth().get_user(user_id)
+            if user["status"] != "ACTIVE":
+                raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
+            actor_role = user["role"]
+        if actor_role != "CLIENT":
             raise BusinessRuleError("Подать заявку может только пользователь с ролью CLIENT")
         app = next((a for a in self.applications.values() if a["user_id"] == user_id), None)
         if app is not None and app["status"] in ("PENDING", "APPROVED"):
@@ -64,8 +71,8 @@ class MockAdminClient(AdminClientBase):
         app.update(documents_url=url, status="PENDING", submitted_at=now_iso(), verified_at=None)
         return app
 
-    def verify_expert(self, application_id: str, admin_id: str, approve: bool) -> dict:
-        self._require_admin(admin_id)
+    def verify_expert(self, application_id: str, admin_id: str, approve: bool, actor_role: Optional[str] = None) -> dict:
+        self._require_admin(admin_id, actor_role)
         app = self.applications.get(application_id)
         if app is None:
             raise NotFoundError(f"Заявка эксперта {application_id} не найдена")
@@ -76,12 +83,14 @@ class MockAdminClient(AdminClientBase):
             self._auth().assign_role(app["user_id"], "EXPERT")
         return app
 
-    def block_user(self, admin_id: str, user_id: str) -> dict:
-        self._require_admin(admin_id)
+    def block_user(self, admin_id: str, user_id: str, actor_role: Optional[str] = None) -> dict:
+        self._require_admin(admin_id, actor_role)
         target = self._auth().get_user(user_id)
         if target["role"] == "ADMIN":
             raise BusinessRuleError("Администратора заблокировать нельзя")
         if target["status"] == "BLOCKED":
             raise BusinessRuleError("Пользователь уже заблокирован")
         self._auth().set_status(user_id, "BLOCKED")
+        from .. import clients
+        clients.security_client.revoke_user_sessions(user_id)       
         return {"user_id": user_id, "status": "BLOCKED"}

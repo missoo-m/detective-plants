@@ -47,7 +47,11 @@ class MockPaymentClient(PaymentClientBase):
         from .. import clients
         return clients
 
-    def _require_role(self, user_id: str, role: str) -> None:
+    def _require_role(self, user_id: str, role: str, actor_role: Optional[str] = None) -> None:
+        if actor_role is not None:                      
+            if actor_role != role:
+                raise PermissionDeniedError(f"Действие доступно только роли {role}")
+            return
         user = self._registry().auth_client.get_user(user_id)
         if user["status"] != "ACTIVE":
             raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
@@ -79,7 +83,6 @@ class MockPaymentClient(PaymentClientBase):
             items = [t for t in items if parse_iso(t["created_at"]) <= end]
         return items
 
-    # ---- чтение
     def get_transaction(self, transaction_id: str) -> dict:
         tx = self.transactions.get(transaction_id)
         if not tx:
@@ -131,8 +134,8 @@ class MockPaymentClient(PaymentClientBase):
                 "withdrawn": float(withdrawn), "pending": float(pending),
                 "available": float(earned - commission - withdrawn - pending)}
 
-    # ---- бизнес-операции
-    def create_payment(self, request_id: str, client_id: str, idempotency_key: str) -> dict:
+    def create_payment(self, request_id: str, client_id: str, idempotency_key: str,
+                       actor_role: Optional[str] = None) -> dict:
         key = (idempotency_key or "").strip()
         if not 8 <= len(key) <= 64:
             raise ValidationError("Ключ идемпотентности должен содержать от 8 до 64 символов")
@@ -141,7 +144,7 @@ class MockPaymentClient(PaymentClientBase):
             if existing["request_id"] != request_id or existing["user_id"] != client_id:
                 raise BusinessRuleError("Ключ идемпотентности уже использован для другой операции")
             return existing
-        self._require_role(client_id, "CLIENT")
+        self._require_role(client_id, "CLIENT", actor_role)
         registry = self._registry()
         request = registry.request_client.get_request(request_id)
         if request["client_id"] != client_id:
@@ -159,11 +162,11 @@ class MockPaymentClient(PaymentClientBase):
         registry.chat_client.open_room(request_id, client_id, request["expert_id"])
         return tx
 
-    def request_withdrawal(self, expert_id: str, amount: float) -> dict:
+    def request_withdrawal(self, expert_id: str, amount: float, actor_role: Optional[str] = None) -> dict:
         value = _money(Decimal(str(amount)))
         if value < MIN_WITHDRAWAL:
             raise ValidationError(f"Минимальная сумма вывода — {MIN_WITHDRAWAL} BYN")
-        self._require_role(expert_id, "EXPERT")
+        self._require_role(expert_id, "EXPERT", actor_role)
         available = Decimal(str(self.expert_balance(expert_id)["available"]))
         if value > available:
             raise BusinessRuleError(f"Недостаточно средств: доступно {available} BYN, запрошено {value} BYN")
@@ -172,8 +175,8 @@ class MockPaymentClient(PaymentClientBase):
         self.withdrawals[wd["id"]] = wd
         return wd
 
-    def approve_withdrawal(self, withdrawal_id: str, admin_id: str) -> dict:
-        self._require_role(admin_id, "ADMIN")
+    def approve_withdrawal(self, withdrawal_id: str, admin_id: str, actor_role: Optional[str] = None) -> dict:
+        self._require_role(admin_id, "ADMIN", actor_role)
         wd = self.withdrawals.get(withdrawal_id)
         if not wd:
             raise NotFoundError(f"Заявка на вывод {withdrawal_id} не найдена")

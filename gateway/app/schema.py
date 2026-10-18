@@ -1,4 +1,3 @@
-#Сборка GraphQL-схемы: Query + Mutation 
 import strawberry
 
 from .mutations import Mutation

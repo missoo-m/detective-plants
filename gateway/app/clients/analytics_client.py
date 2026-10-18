@@ -18,7 +18,7 @@ MOCK_DISEASE_STATS = [
 
 
 class MockAnalyticsClient(AnalyticsClientBase):
-    #Mock Analytics Service
+    """Mock Analytics Service (read-модели). В ЛР6 заменим на реальный gRPC."""
 
     def __init__(self):
         self.expert_stats = copy.deepcopy(MOCK_EXPERT_STATS)

@@ -47,14 +47,17 @@ class MockExpertClient(ExpertClientBase):
         from .. import clients
         return clients
 
-    def _require_expert(self, expert_id: str) -> None:
+    def _require_expert(self, expert_id: str, actor_role: Optional[str] = None) -> None:
+        if actor_role is not None:                      # роль уже проверена Gateway (JWT и сессия)
+            if actor_role != "EXPERT":
+                raise PermissionDeniedError("Действие доступно только эксперту")
+            return
         user = self._registry().auth_client.get_user(expert_id)
         if user["status"] != "ACTIVE":
             raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
         if user["role"] != "EXPERT":
             raise PermissionDeniedError("Действие доступно только эксперту")
 
-    # ---- чтение
     def list_responses(self, request_id: str) -> list[dict]:
         return [r for r in self.responses if r["request_id"] == request_id]
 
@@ -77,11 +80,12 @@ class MockExpertClient(ExpertClientBase):
                 return d
         raise NotFoundError(f"Для заявки {request_id} диагноз ещё не поставлен")
 
-    def respond_to_request(self, request_id: str, expert_id: str, comment: Optional[str]) -> dict:
+    def respond_to_request(self, request_id: str, expert_id: str, comment: Optional[str],
+                           actor_role: Optional[str] = None) -> dict:
         comment = (comment or "").strip() or None
         if comment and len(comment) > 500:
             raise ValidationError("Комментарий не должен превышать 500 символов")
-        self._require_expert(expert_id)
+        self._require_expert(expert_id, actor_role)
         request = self._registry().request_client.get_request(request_id)
         if request["status"] != "CREATED":
             raise BusinessRuleError(f"Откликнуться можно только на новую заявку, сейчас статус {request['status']}")
@@ -99,7 +103,8 @@ class MockExpertClient(ExpertClientBase):
         for r in mine:
             r["status"] = "ACCEPTED" if r["expert_id"] == expert_id else "REJECTED"
 
-    def create_diagnosis(self, request_id, expert_id, disease_id, description, duration_days, checklist) -> dict:
+    def create_diagnosis(self, request_id, expert_id, disease_id, description, duration_days, checklist,
+                         actor_role=None) -> dict:
         description = (description or "").strip()
         if not 5 <= len(description) <= 2000:
             raise ValidationError("Описание диагноза должно содержать от 5 до 2000 символов")
@@ -108,7 +113,7 @@ class MockExpertClient(ExpertClientBase):
         steps = [_clean_step(s) for s in checklist]
         if len(steps) > MAX_STEPS:
             raise ValidationError(f"В чек-листе может быть не более {MAX_STEPS} шагов")
-        self._require_expert(expert_id)
+        self._require_expert(expert_id, actor_role)
         registry = self._registry()
         request = registry.request_client.get_request(request_id)
         if request["expert_id"] != expert_id:

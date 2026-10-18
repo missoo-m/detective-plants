@@ -6,7 +6,7 @@ import strawberry
 from . import clients
 from .errors import NotFoundError
 
-# типы enum
+
 @strawberry.enum
 class Role(Enum):
     CLIENT = "CLIENT"
@@ -69,7 +69,6 @@ class ApplicationStatus(Enum):
     REJECTED = "REJECTED"
 
 
-#  типы
 @strawberry.type
 class Profile:
     id: strawberry.ID
@@ -182,7 +181,7 @@ class Request:
         try:
             return to_diagnosis(clients.expert_client.get_diagnosis_by_request(self.id))
         except NotFoundError:
-            return None   
+            return None  
 
 
 @strawberry.type
@@ -372,6 +371,8 @@ class VideoRoom:
 @strawberry.type
 class AuthPayload:
     token: str
+    token_type: str
+    expires_in: int
     user: User
 
 
@@ -467,7 +468,6 @@ class PlatformSummary:
     avg_rating: float
 
 
-#  мапперы
 def to_profile(d: Optional[dict]) -> Optional[Profile]:
     if not d:
         return None
@@ -637,7 +637,8 @@ def to_platform_summary(d: dict) -> PlatformSummary:
 
 
 def to_auth_payload(d: dict) -> AuthPayload:
-    return AuthPayload(token=d["token"], user=to_user(d["user"]))
+    return AuthPayload(token=d["access_token"], token_type=d.get("token_type", "Bearer"),
+                       expires_in=d.get("expires_in", 0), user=to_user(d["user"]))
 
 
 def to_photo(d: dict) -> RequestPhoto:

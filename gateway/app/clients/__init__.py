@@ -1,4 +1,5 @@
-from ..errors import NotFoundError 
+from .. import config
+from ..errors import NotFoundError  # noqa: F401
 from .admin_client import MockAdminClient
 from .analytics_client import MockAnalyticsClient
 from .auth_client import MockAuthClient
@@ -13,6 +14,7 @@ from .payment_client import MockPaymentClient
 from .recovery_client import MockRecoveryClient
 from .request_client import MockRequestClient
 from .satellite_client import MockSatelliteClient
+from ..security.client import AuthSecurityClient
 
 auth_client: AuthClientBase
 request_client: RequestClientBase
@@ -24,11 +26,12 @@ notification_client: NotificationClientBase
 analytics_client: AnalyticsClientBase
 admin_client: AdminClientBase
 satellite_client: SatelliteClientBase
+security_client: AuthSecurityClient
 
 
 def reset_clients() -> None:
     global auth_client, request_client, expert_client, recovery_client, chat_client
-    global payment_client, notification_client, analytics_client, admin_client, satellite_client
+    global payment_client, notification_client, analytics_client, admin_client, satellite_client, security_client
     auth_client = MockAuthClient()
     request_client = MockRequestClient()
     expert_client = MockExpertClient()
@@ -39,6 +42,11 @@ def reset_clients() -> None:
     analytics_client = MockAnalyticsClient()
     admin_client = MockAdminClient()
     satellite_client = MockSatelliteClient()
-
+    if config.AUTH_MODE == "rest":                       # реальный Auth Service по REST
+        from ..security.rest_client import RestAuthSecurityClient
+        security_client = RestAuthSecurityClient()
+    else:                                          
+        from ..security.mock_client import MockAuthSecurityClient
+        security_client = MockAuthSecurityClient(lambda: auth_client)
 
 reset_clients()

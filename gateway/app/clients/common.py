@@ -25,6 +25,7 @@ def lower_bound(value: Optional[str]) -> Optional[datetime]:
 
 
 def upper_bound(value: Optional[str]) -> Optional[datetime]:
+    """Дата без времени ('2026-01-31') включает весь день."""
     if not value:
         return None
     moment = parse_iso(value)
