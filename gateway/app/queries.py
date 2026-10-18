@@ -5,7 +5,7 @@ from typing import Optional
 import strawberry
 from strawberry.types import Info
 
-from .. import clients
+from . import clients
 from .api_types import (
     ApplicationsSummary, ChatRoom, Diagnosis, DiseaseStats, ExpertApplication, ExpertBalance, ExpertStats,
     NdviSummary, Notification, NotificationsSummary, PlatformSummary, RecoveryTracker, Request, RequestsSummary,

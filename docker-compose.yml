@@ -19,7 +19,7 @@ services:
       POSTGRES_USER: request
       POSTGRES_PASSWORD: request_pass
     ports:
-      - "5432:5432"
+      - "5542:5432"
     volumes:
       - request_data:/var/lib/postgresql/data
 

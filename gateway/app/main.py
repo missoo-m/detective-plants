@@ -16,6 +16,14 @@ def health():
     return {"status": "ok"}
 
 
+from .clients import reset_clients
+
+@app.post("/debug/reset")
+def debug_reset():
+    reset_clients()
+    return {"status": "reset"}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host=config.HOST, port=config.PORT, reload=True)

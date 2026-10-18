@@ -3,7 +3,7 @@ import strawberry
 from strawberry.file_uploads import Upload
 from strawberry.types import Info
 
-from .. import clients
+from . import clients
 from .api_types import (
     AuthPayload, Diagnosis, ExpertApplication, ExpertResponse, Message, Notification, Profile, RecoveryTracker,
     Request, RequestPhoto, SatelliteField, TreatmentHistory, TreatmentStep, Transaction, User, VideoRoom, Withdrawal,

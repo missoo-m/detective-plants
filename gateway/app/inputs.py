@@ -8,7 +8,6 @@ from .api_types import (
     ApplicationStatus, NotificationStatus, RequestStatus, Role, UserStatus,
 )
 
-#  сортировка
 @strawberry.enum
 class SortDirection(Enum):
     ASC = "ASC"
@@ -59,11 +58,10 @@ class TransactionSortInput:
     direction: SortDirection = SortDirection.ASC
 
 
-#  фильтры
 @strawberry.input
 class RequestFilterInput:
     statuses: Optional[list[RequestStatus]] = None
-    search: Optional[str] = None                 # поиск по описанию симптомов
+    search: Optional[str] = None               
     created_from: Optional[str] = None          
     created_to: Optional[str] = None
     has_expert: Optional[bool] = None
@@ -73,7 +71,7 @@ class RequestFilterInput:
 class UserFilterInput:
     role: Optional[Role] = None
     status: Optional[UserStatus] = None
-    search: Optional[str] = None                 # по имени или email
+    search: Optional[str] = None                 
 
 
 @strawberry.input
