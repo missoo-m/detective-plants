@@ -1,4 +1,3 @@
-#Интерфейсы и заглушки (mock) других сервисов для Admin Service
 import uuid
 from abc import ABC, abstractmethod
 from typing import Optional

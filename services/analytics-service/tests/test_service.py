@@ -29,7 +29,7 @@ def test_expert_stats(service):
 
 
 def test_top_experts_sorting(service):
-    assert [e.expert_id for e in service.top_experts()] == [U6, U2]                         
+    assert [e.expert_id for e in service.top_experts()] == [U6, U2]                        
     assert [e.expert_id for e in service.top_experts(sort_by="avg_rating")] == [U2, U6]
     assert [e.expert_id for e in service.top_experts(descending=False, limit=1)] == [U2]
     with pytest.raises(InvalidValueError):

@@ -46,7 +46,11 @@ class ExpertService:
         self._requests = requests or MockRequestClient()
         self._recovery = recovery or MockRecoveryClient()
 
-    def _require_expert(self, expert_id: str) -> None:
+    def _require_expert(self, expert_id: str, actor_role: Optional[str] = None) -> None:
+        if actor_role is not None:
+            if actor_role != "EXPERT":
+                raise PermissionDeniedError("Действие доступно только эксперту")
+            return
         user = self._auth.get_user(expert_id)
         if user["status"] != "ACTIVE":
             raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
@@ -93,12 +97,13 @@ class ExpertService:
                 raise NotFoundError(f"Для заявки {request_id} диагноз ещё не поставлен")
             return _to_diagnosis_dto(diagnosis)
 
-    def respond_to_request(self, request_id: str, expert_id: str, comment: Optional[str] = None) -> ResponseDTO:
+    def respond_to_request(self, request_id: str, expert_id: str, comment: Optional[str] = None,
+                           actor_role: Optional[str] = None) -> ResponseDTO:
         rid, eid = parse_uuid(request_id), parse_uuid(expert_id)
         comment = (comment or "").strip() or None
         if comment and len(comment) > 500:
             raise InvalidValueError("Комментарий не должен превышать 500 символов")
-        self._require_expert(expert_id)
+        self._require_expert(expert_id, actor_role)
         request = self._requests.get_request_details(request_id)
         if request["status"] != "CREATED":
             raise BusinessRuleError(f"Откликнуться можно только на новую заявку, сейчас статус {request['status']}")
@@ -123,7 +128,8 @@ class ExpertService:
             return [_to_response_dto(r) for r in responses]
 
     def create_diagnosis(self, request_id: str, expert_id: str, disease_id: str, description: str,
-                         duration_days: int = 14, checklist: Optional[list] = None) -> DiagnosisDTO:
+                         duration_days: int = 14, checklist: Optional[list] = None,
+                         actor_role: Optional[str] = None) -> DiagnosisDTO:
         rid, eid, did = parse_uuid(request_id), parse_uuid(expert_id), parse_uuid(disease_id)
         description = (description or "").strip()
         if not 5 <= len(description) <= 2000:
@@ -133,13 +139,13 @@ class ExpertService:
         steps = [_clean_step(s) for s in (checklist or [])]
         if len(steps) > MAX_STEPS:
             raise InvalidValueError(f"В чек-листе может быть не более {MAX_STEPS} шагов")
-        self._require_expert(expert_id)
+        self._require_expert(expert_id, actor_role)
         request = self._requests.get_request_details(request_id)
         if request["expert_id"] != expert_id:
             raise PermissionDeniedError("Диагноз может поставить только эксперт, выбранный клиентом")
         if request["status"] != "IN_PROGRESS":
             raise BusinessRuleError("Диагноз можно поставить только по оплаченной заявке в работе")
-        self._requests.get_disease(disease_id)                      # болезнь должна быть в справочнике
+        self._requests.get_disease(disease_id)                      
         with self._session_factory() as session:
             repo = DiagnosisRepository(session)
             if repo.get_by_request(rid) is not None:

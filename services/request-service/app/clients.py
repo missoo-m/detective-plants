@@ -1,4 +1,3 @@
-
 import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -54,7 +53,7 @@ class MockAuthClient(AuthClient):
 
 class MockExpertClient(ExpertClient):
     def __init__(self, responded: Optional[set] = None):
-        self.responded = set(responded or set())   
+        self.responded = set(responded or set())    
         self.accepted: list = []
 
     def has_responded(self, request_id: str, expert_id: str) -> bool:

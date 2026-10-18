@@ -1,4 +1,3 @@
-
 from .database import init_db
 from .seed import seed
 from .service import AdminService

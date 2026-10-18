@@ -28,13 +28,6 @@ class ValidationResult:
     role: Optional[str] = None
     status: Optional[str] = None
 
-
-@dataclass
-class AuthResultDTO:
-    token: str
-    user: UserDTO
-
-
 @dataclass
 class UsersSummaryDTO:
     total: int

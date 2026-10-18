@@ -29,7 +29,6 @@ def service(expert_stub):
     assert seed(factory) is False
     return RequestService(factory, expert=expert_stub)
 
-
 def test_get_request_and_details(service):
     req = service.get_request(R1)
     assert len(req.photos) == 2 and req.status == "CREATED"
@@ -82,13 +81,13 @@ def test_create_request_validation(service):
     with pytest.raises(InvalidValueError):
         service.create_request(U4, "Описание достаточной длины", ["https://x/%d.jpg" % i for i in range(6)])
     with pytest.raises(PermissionDeniedError):
-        service.create_request(U2, "Эксперт не может создавать заявки")      
+        service.create_request(U2, "Эксперт не может создавать заявки")       
     with pytest.raises(PermissionDeniedError):
         service.create_request(U5, "Заблокированный пользователь")
 
 
 def test_active_requests_limit(service):
-    service.create_request(U1, "Третья активная заявка клиента")          
+    service.create_request(U1, "Третья активная заявка клиента")           
     with pytest.raises(BusinessRuleError):
         service.create_request(U1, "Четвёртая активная заявка клиента")
 
@@ -101,9 +100,9 @@ def test_select_expert(service, expert_stub):
 
 def test_select_expert_rules(service):
     with pytest.raises(PermissionDeniedError):
-        service.select_expert(R1, U4, U2)                  
+        service.select_expert(R1, U4, U2)                 
     with pytest.raises(BusinessRuleError):
-        service.select_expert(R3, U4, U2)                 
+        service.select_expert(R3, U4, U2)                  
     with pytest.raises(PermissionDeniedError):
         service.select_expert(R1, U1, U4)                  
     with pytest.raises(BusinessRuleError):
@@ -115,9 +114,9 @@ def test_cancel_request(service):
     with pytest.raises(BusinessRuleError):
         service.cancel_request(R1, U1)                     
     with pytest.raises(BusinessRuleError):
-        service.cancel_request(R2, U1)                   
+        service.cancel_request(R2, U1)                     
     with pytest.raises(PermissionDeniedError):
-        service.cancel_request(R3, U1)                  
+        service.cancel_request(R3, U1)                     
 
 
 def test_status_flow(service):
@@ -126,7 +125,7 @@ def test_status_flow(service):
     done = service.complete_request(R1)
     assert done.status == "DONE" and done.completed_at is not None
     with pytest.raises(BusinessRuleError):
-        service.start_work(R3)                           
+        service.start_work(R3)                             
 
 
 def test_add_photo(service):
@@ -137,4 +136,11 @@ def test_add_photo(service):
     with pytest.raises(PermissionDeniedError):
         service.add_photo(R1, U4, "leaf.jpg", b"123")
     with pytest.raises(BusinessRuleError):
-        service.add_photo(R2, U1, "leaf.jpg", b"123")    
+        service.add_photo(R2, U1, "leaf.jpg", b"123")      
+
+
+def test_role_passed_by_gateway_is_enforced(service):
+    with pytest.raises(PermissionDeniedError):
+        service.create_request(U1, "Клиент с ролью эксперта из токена", actor_role="EXPERT")
+    req = service.create_request(U4, "Белый налёт на листьях огурцов", actor_role="CLIENT")
+    assert req.status == "CREATED"

@@ -5,7 +5,6 @@ from sqlalchemy.pool import StaticPool
 
 from app.errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from app.models import Base
-from app.security import issue_token, verify_token
 from app.seed import seed, sid
 from app.service import AuthService
 
@@ -18,6 +17,7 @@ def service():
     assert seed(factory) is True
     assert seed(factory) is False
     return AuthService(factory)
+
 
 def test_get_user(service):
     user = service.get_user(str(sid("user-2")))
@@ -61,6 +61,7 @@ def test_validate_user(service):
     assert service.validate_user("garbage").valid is False
 
 
+# ---------------------------------------------------------------- бизнес-операции
 def test_register_creates_client(service):
     user = service.register("New.User@Example.com", "strongpass1", "Новый Клиент")
     assert user.role == "CLIENT" and user.status == "ACTIVE" and user.email == "new.user@example.com"
@@ -78,20 +79,15 @@ def test_register_validation(service):
         service.register("a@b.by", "strongpass1", " ")
 
 
-def test_login(service):
-    result = service.login("anna@example.com", "password123")
-    assert result.user.name == "Анна Петрова" and verify_token(result.token) == result.user.id
+def test_authenticate(service):
+    user = service.authenticate("Anna@Example.com ", "password123")
+    assert user.name == "Анна Петрова" and user.role == "CLIENT"
     with pytest.raises(PermissionDeniedError):
-        service.login("anna@example.com", "wrong-password")
+        service.authenticate("anna@example.com", "wrong-password")
     with pytest.raises(PermissionDeniedError):
-        service.login("oleg@example.com", "password123")        
-
-
-def test_token_expiry():
-    token = issue_token("u-1", now=0)
-    assert verify_token(token, now=10) == "u-1"
-    assert verify_token(token, now=10**9) is None
-    assert verify_token(token + "x") is None
+        service.authenticate("nobody@example.com", "password123")
+    with pytest.raises(PermissionDeniedError):
+        service.authenticate("oleg@example.com", "password123")        # заблокирован
 
 
 def test_update_profile(service):
@@ -106,9 +102,9 @@ def test_update_profile(service):
 def test_assign_role_and_status(service):
     assert service.assign_role(str(sid("user-4")), "EXPERT").role == "EXPERT"
     with pytest.raises(BusinessRuleError):
-        service.assign_role(str(sid("user-3")), "CLIENT")            
+        service.assign_role(str(sid("user-3")), "CLIENT")            # роль админа менять нельзя
     assert service.set_status(str(sid("user-1")), "BLOCKED").status == "BLOCKED"
     with pytest.raises(BusinessRuleError):
-        service.set_status(str(sid("user-3")), "BLOCKED")           
+        service.set_status(str(sid("user-3")), "BLOCKED")            # админа блокировать нельзя
     with pytest.raises(InvalidValueError):
         service.set_status(str(sid("user-1")), "UNKNOWN")

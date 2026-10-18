@@ -1,7 +1,3 @@
-"""
-    python scripts/run_all.py init    # создать таблицы и тестовые данные во всех БД 
-    python scripts/run_all.py test    # прогнать тесты всех сервисов и gateway
-"""
 import subprocess
 import sys
 from pathlib import Path

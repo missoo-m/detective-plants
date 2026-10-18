@@ -31,7 +31,7 @@ def service(auth):
 
 
 def test_filters_sort_summary(service):
-    assert [a.status for a in service.list_applications()] == ["PENDING", "APPROVED"]            
+    assert [a.status for a in service.list_applications()] == ["PENDING", "APPROVED"]            # новые сверху
     assert [a.status for a in service.list_applications(descending=False)] == ["APPROVED", "PENDING"]
     assert len(service.list_applications(status="PENDING")) == 1
     assert len(service.list_applications(submitted_from=datetime(2026, 1, 10))) == 1
@@ -47,11 +47,11 @@ def test_submit_application(service):
     app = service.submit_application(U1, "https://minio/docs/user-1.pdf")
     assert app.status == "PENDING" and app.user_id == U1
     with pytest.raises(BusinessRuleError):
-        service.submit_application(U1, "https://minio/docs/again.pdf")      
+        service.submit_application(U1, "https://minio/docs/again.pdf")      # уже на рассмотрении
     with pytest.raises(BusinessRuleError):
-        service.submit_application(U2, "https://minio/docs/user-2.pdf")   
+        service.submit_application(U2, "https://minio/docs/user-2.pdf")     # эксперт, не клиент
     with pytest.raises(PermissionDeniedError):
-        service.submit_application(U5, "https://minio/docs/user-5.pdf")     
+        service.submit_application(U5, "https://minio/docs/user-5.pdf")     # заблокирован
     with pytest.raises(InvalidValueError):
         service.submit_application(U4, "ftp://nope")
 
@@ -59,9 +59,9 @@ def test_submit_application(service):
 def test_verify_expert_approve(service, auth):
     result = service.verify_expert(APP1, U3, approve=True)
     assert result.status == "APPROVED" and result.verified_at is not None
-    assert auth.users[U4][0] == "EXPERT"                                   
+    assert auth.users[U4][0] == "EXPERT"                                    # роль выдана
     with pytest.raises(BusinessRuleError):
-        service.verify_expert(APP1, U3, approve=True)                      
+        service.verify_expert(APP1, U3, approve=True)                       # уже рассмотрена
 
 
 def test_verify_expert_reject_and_resubmit(service, auth):
@@ -81,8 +81,19 @@ def test_verify_requires_admin(service):
 def test_block_user(service, auth):
     assert service.block_user(U3, U1)["status"] == "BLOCKED" and auth.users[U1][1] == "BLOCKED"
     with pytest.raises(BusinessRuleError):
-        service.block_user(U3, U1)                                          
+        service.block_user(U3, U1)                                          # уже заблокирован
     with pytest.raises(BusinessRuleError):
         service.block_user(U3, U3)                                          # админа блокировать нельзя
     with pytest.raises(PermissionDeniedError):
         service.block_user(U2, U4)
+
+
+def test_role_passed_by_gateway_is_enforced(service):
+    with pytest.raises(PermissionDeniedError):
+        service.verify_expert(APP1, U3, approve=True, actor_role="CLIENT")
+    with pytest.raises(PermissionDeniedError):
+        service.block_user(U3, U1, actor_role="EXPERT")
+    with pytest.raises(BusinessRuleError):
+        service.submit_application(U2, "https://minio/docs/u2.pdf", actor_role="EXPERT")
+    assert service.submit_application(U1, "https://minio/docs/u1.pdf", actor_role="CLIENT").status == "PENDING"
+    assert service.verify_expert(APP1, U3, approve=True, actor_role="ADMIN").status == "APPROVED"

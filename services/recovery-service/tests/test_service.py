@@ -43,7 +43,7 @@ def test_reads(service):
 
 
 def test_progress_aggregate(service):
-    p = service.tracker_progress(T1, now=datetime(2026, 1, 23, 12, 0))     
+    p = service.tracker_progress(T1, now=datetime(2026, 1, 23, 12, 0))      
     assert p.total_days == 14 and p.elapsed_days == 7 and p.percent == 50.0
     assert p.photos_count == 1 and p.updates_count == 1
     assert service.tracker_progress(T1, now=datetime(2026, 3, 1)).percent == 100.0
@@ -54,7 +54,7 @@ def test_create_tracker(service):
     t = service.create_tracker(R1, U1, U2, duration_days=7)
     assert t.status == "ACTIVE" and t.current_stage == "START"
     with pytest.raises(BusinessRuleError):
-        service.create_tracker(R1, U1, U2)                                  
+        service.create_tracker(R1, U1, U2)                                 
     with pytest.raises(InvalidValueError):
         service.create_tracker(str(sid("req-9")), U1, U2, duration_days=0)
 
@@ -62,7 +62,7 @@ def test_create_tracker(service):
 def test_upload_photo(service, stubs):
     h = service.upload_photo(T1, U1, "leaf.png", b"data")
     assert h.record_type == "PHOTO" and h.photo_url.endswith("leaf.png")
-    assert stubs[1].sent[-1][0] == U2                                        
+    assert stubs[1].sent[-1][0] == U2                                       
     with pytest.raises(PermissionDeniedError):
         service.upload_photo(T1, U4, "leaf.png", b"data")
     with pytest.raises(InvalidValueError):
@@ -83,7 +83,7 @@ def test_complete_tracker(service, stubs):
     with pytest.raises(PermissionDeniedError):
         service.complete_tracker(T1, U1)
     done = service.complete_tracker(T1, U2)
-    assert done.status == "COMPLETED" and stubs[0].completed == [R2]       
+    assert done.status == "COMPLETED" and stubs[0].completed == [R2]          
     with pytest.raises(BusinessRuleError):
         service.complete_tracker(T1, U2)
     with pytest.raises(BusinessRuleError):

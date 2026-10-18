@@ -50,7 +50,7 @@ def test_create_field(service):
     f = service.create_field(U4, "  Моя делянка ", SQUARE)
     assert f.name == "Моя делянка" and f.owner_id == U4
     with pytest.raises(BusinessRuleError):
-        service.create_field(U4, "моя делянка", SQUARE)                    
+        service.create_field(U4, "моя делянка", SQUARE)                     
     with pytest.raises(InvalidValueError):
         service.create_field(U4, "", SQUARE)
     with pytest.raises(InvalidValueError):
@@ -70,7 +70,7 @@ def test_field_limit(service):
 
 
 def test_record_measurement_creates_alert_on_drop(service):
-    service.record_measurement(F2, 0.50, datetime(2026, 1, 20, 10, 0))  
+    service.record_measurement(F2, 0.50, datetime(2026, 1, 20, 10, 0))        
     alerts = service.list_alerts(F2)
     assert len(alerts) == 1 and alerts[0].type == "NDVI_DROP" and "30%" in alerts[0].message
     service.record_measurement(F2, 0.49, datetime(2026, 1, 21, 10, 0))        
@@ -81,6 +81,6 @@ def test_record_measurement_rules(service):
     with pytest.raises(InvalidValueError):
         service.record_measurement(F1, 1.5)
     with pytest.raises(BusinessRuleError):
-        service.record_measurement(F1, 0.6, datetime(2026, 1, 1))              
+        service.record_measurement(F1, 0.6, datetime(2026, 1, 1))            
     with pytest.raises(NotFoundError):
         service.record_measurement(str(sid("fld-999")), 0.5)

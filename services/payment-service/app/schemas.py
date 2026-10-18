@@ -34,8 +34,8 @@ class TransactionsSummaryDTO:
 @dataclass
 class BalanceDTO:
     expert_id: str
-    earned: float             
-    commission: float          
-    withdrawn: float          
-    pending: float           
-    available: float       
+    earned: float              
+    commission: float         
+    withdrawn: float        
+    pending: float             
+    available: float

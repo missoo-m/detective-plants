@@ -8,8 +8,8 @@ from .database import get_session_factory
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import Profile, ReferralProfile, User, UserSettings
 from .repository import SORT_COLUMNS, UserRepository
-from .schemas import AuthResultDTO, ProfileDTO, UserDTO, UsersSummaryDTO, ValidationResult
-from .security import hash_password, issue_token, verify_password
+from .schemas import ProfileDTO, UserDTO, UsersSummaryDTO, ValidationResult
+from .security import hash_password, verify_password
 from .utils import fmt_dt, parse_uuid
 
 ROLES = {"CLIENT", "EXPERT", "ADMIN"}
@@ -101,14 +101,14 @@ class AuthService:
             session.commit()
             return _to_dto(user)
 
-    def login(self, email: str, password: str) -> AuthResultDTO:
+    def authenticate(self, email: str, password: str) -> UserDTO:
         with self._session_factory() as session:
             user = UserRepository(session).get_by_email((email or "").strip().lower())
             if user is None or not verify_password(password or "", user.password_hash):
                 raise PermissionDeniedError("Неверный email или пароль")
             if user.status != "ACTIVE":
                 raise PermissionDeniedError("Учётная запись заблокирована или не активирована")
-            return AuthResultDTO(token=issue_token(str(user.id)), user=_to_dto(user))
+            return _to_dto(user)
 
     def update_profile(self, user_id: str, name: Optional[str] = None, photo_url: Optional[str] = None,
                        description: Optional[str] = None, language: Optional[str] = None) -> UserDTO:

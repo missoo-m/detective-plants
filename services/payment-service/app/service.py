@@ -41,7 +41,11 @@ class PaymentService:
         self._requests = requests or MockRequestClient()
         self._chat = chat or MockChatClient()
 
-    def _require_role(self, user_id: str, role: str) -> None:
+    def _require_role(self, user_id: str, role: str, actor_role: Optional[str] = None) -> None:
+        if actor_role is not None:
+            if actor_role != role:
+                raise PermissionDeniedError(f"Действие доступно только роли {role}")
+            return
         user = self._auth.get_user(user_id)
         if user["status"] != "ACTIVE":
             raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
@@ -128,7 +132,8 @@ class PaymentService:
         return BalanceDTO(expert_id=str(eid), earned=float(earned), commission=float(commission),
                           withdrawn=float(withdrawn), pending=float(pending), available=float(available))
 
-    def create_payment(self, request_id: str, client_id: str, idempotency_key: str) -> TransactionDTO:
+    def create_payment(self, request_id: str, client_id: str, idempotency_key: str,
+                       actor_role: Optional[str] = None) -> TransactionDTO:
         key = (idempotency_key or "").strip()
         if not 8 <= len(key) <= 64:
             raise InvalidValueError("Ключ идемпотентности должен содержать от 8 до 64 символов")
@@ -140,7 +145,7 @@ class PaymentService:
                 if existing.request_id != rid or existing.user_id != cid:
                     raise BusinessRuleError("Ключ идемпотентности уже использован для другой операции")
                 return _tx(existing)
-            self._require_role(client_id, "CLIENT")
+            self._require_role(client_id, "CLIENT", actor_role)
             request = self._requests.get_request(request_id)
             if request["client_id"] != client_id:
                 raise PermissionDeniedError("Оплатить заявку может только её автор")
@@ -150,21 +155,21 @@ class PaymentService:
                 raise BusinessRuleError("Заявка уже оплачена")
             tx = Transaction(request_id=rid, user_id=cid, expert_id=parse_uuid(request["expert_id"]),
                              amount=config.SERVICE_PRICE, operation_type="PAYMENT", status="SUCCESS",
-                             idempotency_key=key)             
+                             idempotency_key=key)            
             repo.add(tx)
             session.commit()
             result = _tx(tx)
             expert_id = request["expert_id"]
-        self._requests.start_work(request_id)                 
+        self._requests.start_work(request_id)               
         self._chat.open_room(request_id, client_id, expert_id)
         return result
 
-    def request_withdrawal(self, expert_id: str, amount: float) -> WithdrawalDTO:
+    def request_withdrawal(self, expert_id: str, amount: float, actor_role: Optional[str] = None) -> WithdrawalDTO:
         eid = parse_uuid(expert_id)
         value = _money(Decimal(str(amount)))
         if value < config.MIN_WITHDRAWAL:
             raise InvalidValueError(f"Минимальная сумма вывода — {config.MIN_WITHDRAWAL} BYN")
-        self._require_role(expert_id, "EXPERT")
+        self._require_role(expert_id, "EXPERT", actor_role)
         with self._session_factory() as session:
             available = Decimal(str(self._balance(session, eid).available))
             if value > available:
@@ -174,8 +179,8 @@ class PaymentService:
             session.commit()
             return _wd(wd)
 
-    def approve_withdrawal(self, withdrawal_id: str, admin_id: str) -> WithdrawalDTO:
-        self._require_role(admin_id, "ADMIN")
+    def approve_withdrawal(self, withdrawal_id: str, admin_id: str, actor_role: Optional[str] = None) -> WithdrawalDTO:
+        self._require_role(admin_id, "ADMIN", actor_role)
         with self._session_factory() as session:
             wd = WithdrawalRepository(session).get_by_id(parse_uuid(withdrawal_id))
             if wd is None:

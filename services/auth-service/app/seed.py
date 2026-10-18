@@ -1,4 +1,3 @@
-"""Тестовые данные Auth Service."""
 import uuid
 from datetime import datetime
 from typing import Callable, Optional
@@ -16,7 +15,6 @@ def sid(name: str) -> uuid.UUID:
 
 
 USERS = [
-    # name-id, email, имя, роль, статус, дата, рейтинг, описание
     ("user-1", "anna@example.com", "Анна Петрова", "CLIENT", "ACTIVE",
      datetime(2026, 1, 10, 9, 0), 0.0, "Владелица теплицы"),
     ("user-2", "ivan.expert@example.com", "Иван Сидоров", "EXPERT", "ACTIVE",

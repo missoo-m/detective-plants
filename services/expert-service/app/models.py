@@ -16,7 +16,7 @@ class ExpertResponse(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     request_id = Column(Uuid(as_uuid=True), nullable=False)   
-    expert_id = Column(Uuid(as_uuid=True), nullable=False)   
+    expert_id = Column(Uuid(as_uuid=True), nullable=False)    
     comment = Column(Text)
     status = Column(String(20), nullable=False, default="PENDING")
     created_at = Column(DateTime, nullable=False, default=utcnow)
@@ -43,7 +43,7 @@ class TreatmentChecklist(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     diagnosis_id = Column(Uuid(as_uuid=True), ForeignKey("diagnoses.id"), nullable=False)
-    position = Column(Integer, nullable=False, default=0)    
+    position = Column(Integer, nullable=False, default=0)     
     step = Column(Text, nullable=False)
     frequency = Column(String(50))
     duration_days = Column(Integer)

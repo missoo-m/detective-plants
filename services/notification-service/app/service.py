@@ -71,7 +71,7 @@ class NotificationService:
                 raise NotFoundError(f"Уведомление {notification_id} не найдено")
             if str(n.user_id) != user_id:
                 raise PermissionDeniedError("Можно отмечать только свои уведомления")
-            n.status = "READ"                                 
+            n.status = "READ"                                  
             session.commit()
             return _dto(n)
 

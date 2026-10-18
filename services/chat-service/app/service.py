@@ -166,7 +166,7 @@ class ChatService:
                 raise BusinessRuleError("Предыдущая видеоконсультация ещё не завершена")
             video = VideoRoom(chat_room_id=room.id, room_url="", status="CREATED")
             repo.add(video)
-            session.flush()                                      
+            session.flush()                                       # получаем id для ссылки
             video.room_url = f"https://meet.example/room/{video.id}"
             session.commit()
             return _video(video)

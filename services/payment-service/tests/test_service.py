@@ -71,7 +71,7 @@ def test_get_and_withdrawal_list(service):
 
 
 def test_create_payment_flow(service, stubs):
-    tx = service.create_payment(R3, U4, "key-r3-0001")                
+    tx = service.create_payment(R3, U4, "key-r3-0001")                    
     assert tx.amount == 25.0 and tx.status == "SUCCESS" and tx.operation_type == "PAYMENT"
     assert stubs[0].started == [R3] and stubs[1].opened == [(R3, U4, U2)]
     assert service.expert_balance(U2).earned == 75.0
@@ -80,31 +80,31 @@ def test_create_payment_flow(service, stubs):
 def test_create_payment_is_idempotent(service, stubs):
     first = service.create_payment(R3, U4, "key-r3-0001")
     again = service.create_payment(R3, U4, "key-r3-0001")
-    assert again.id == first.id and stubs[0].started == [R3]             
+    assert again.id == first.id and stubs[0].started == [R3]              
     with pytest.raises(BusinessRuleError):
         service.create_payment(R2, U1, "key-r3-0001")                      
 
 
 def test_create_payment_rules(service):
     with pytest.raises(BusinessRuleError):
-        service.create_payment(R1, U1, "key-r1-0001")                     
+        service.create_payment(R1, U1, "key-r1-0001")                      
     with pytest.raises(BusinessRuleError):
         service.create_payment(R2, U1, "key-r2-0001")                      
     with pytest.raises(PermissionDeniedError):
         service.create_payment(R3, U1, "key-r3-0002")                      
     with pytest.raises(PermissionDeniedError):
-        service.create_payment(R3, U2, "key-r3-0003")                     
+        service.create_payment(R3, U2, "key-r3-0003")                      
     with pytest.raises(InvalidValueError):
         service.create_payment(R3, U4, "short")
 
 
 def test_withdrawal_rules(service):
     with pytest.raises(InvalidValueError):
-        service.request_withdrawal(U2, 5)                                 
+        service.request_withdrawal(U2, 5)                                  
     with pytest.raises(BusinessRuleError):
-        service.request_withdrawal(U2, 16)                            
+        service.request_withdrawal(U2, 16)                                 
     with pytest.raises(PermissionDeniedError):
-        service.request_withdrawal(U1, 15)                              
+        service.request_withdrawal(U1, 15)                                 
     wd = service.request_withdrawal(U2, 15)
     assert wd.status == "PENDING" and service.expert_balance(U2).available == 0.0
     with pytest.raises(BusinessRuleError):
@@ -114,12 +114,22 @@ def test_withdrawal_rules(service):
 def test_approve_withdrawal(service):
     wd = service.list_withdrawals(expert_id=U2)[0]
     with pytest.raises(PermissionDeniedError):
-        service.approve_withdrawal(wd.id, U2)                              
+        service.approve_withdrawal(wd.id, U2)                             
     done = service.approve_withdrawal(wd.id, U3)
     assert done.status == "APPROVED" and done.processed_at is not None
     b = service.expert_balance(U2)
     assert b.withdrawn == 30.0 and b.pending == 0.0 and b.available == 15.0
     with pytest.raises(BusinessRuleError):
-        service.approve_withdrawal(wd.id, U3)                             
+        service.approve_withdrawal(wd.id, U3)                              # повторно нельзя
     with pytest.raises(NotFoundError):
         service.approve_withdrawal(str(sid("wd-999")), U3)
+
+def test_role_passed_by_gateway_is_enforced(service):
+    with pytest.raises(PermissionDeniedError):
+        service.create_payment(R3, U4, "key-r3-0009", actor_role="EXPERT")
+    with pytest.raises(PermissionDeniedError):
+        service.request_withdrawal(U2, 10, actor_role="CLIENT")
+    wd = service.list_withdrawals(expert_id=U2)[0]
+    with pytest.raises(PermissionDeniedError):
+        service.approve_withdrawal(wd.id, U3, actor_role="EXPERT")
+    assert service.approve_withdrawal(wd.id, U3, actor_role="ADMIN").status == "APPROVED"

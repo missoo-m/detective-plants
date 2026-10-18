@@ -17,6 +17,6 @@ class ExpertApplication(Base):
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(Uuid(as_uuid=True), unique=True, nullable=False)     
     documents_url = Column(String(500))
-    status = Column(String(20), nullable=False, default="PENDING")       
+    status = Column(String(20), nullable=False, default="PENDING")       # PENDING / APPROVED / REJECTED
     submitted_at = Column(DateTime, nullable=False, default=utcnow)
     verified_at = Column(DateTime)

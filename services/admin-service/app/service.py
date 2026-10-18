@@ -24,12 +24,15 @@ class AdminService:
         self._session_factory = session_factory or get_session_factory()
         self._auth = auth or MockAuthClient()
 
-    def _require_admin(self, admin_id: str) -> None:
+    def _require_admin(self, admin_id: str, actor_role: Optional[str] = None) -> None:
+        if actor_role is not None:
+            if actor_role != "ADMIN":
+                raise PermissionDeniedError("Действие доступно только администратору")
+            return
         user = self._auth.get_user(admin_id)
         if user["status"] != "ACTIVE" or user["role"] != "ADMIN":
             raise PermissionDeniedError("Действие доступно только администратору")
 
-    # чтение
     def get_application(self, application_id: str) -> ApplicationDTO:
         with self._session_factory() as session:
             app = ApplicationRepository(session).get_by_id(parse_uuid(application_id))
@@ -52,16 +55,17 @@ class AdminService:
             by_status = ApplicationRepository(session).count_by_status()
         return ApplicationsSummaryDTO(total=sum(by_status.values()), by_status=by_status)
 
-    # бизнес-операции
-    def submit_application(self, user_id: str, documents_url: str) -> ApplicationDTO:
+    def submit_application(self, user_id: str, documents_url: str, actor_role: Optional[str] = None) -> ApplicationDTO:
         url = (documents_url or "").strip()
         if not url.startswith(("http://", "https://")) or len(url) > 500:
             raise InvalidValueError("documents_url должен быть ссылкой http(s) длиной до 500 символов")
         uid = parse_uuid(user_id)
-        user = self._auth.get_user(user_id)
-        if user["status"] != "ACTIVE":
-            raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
-        if user["role"] != "CLIENT":
+        if actor_role is None:
+            user = self._auth.get_user(user_id)
+            if user["status"] != "ACTIVE":
+                raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
+            actor_role = user["role"]
+        if actor_role != "CLIENT":
             raise BusinessRuleError("Подать заявку может только пользователь с ролью CLIENT")
         with self._session_factory() as session:
             repo = ApplicationRepository(session)
@@ -76,8 +80,9 @@ class AdminService:
             session.commit()
             return _dto(app)
 
-    def verify_expert(self, application_id: str, admin_id: str, approve: bool) -> ApplicationDTO:
-        self._require_admin(admin_id)
+    def verify_expert(self, application_id: str, admin_id: str, approve: bool,
+                      actor_role: Optional[str] = None) -> ApplicationDTO:
+        self._require_admin(admin_id, actor_role)
         with self._session_factory() as session:
             app = ApplicationRepository(session).get_by_id(parse_uuid(application_id))
             if app is None:
@@ -92,8 +97,8 @@ class AdminService:
             self._auth.assign_role(user_id, "EXPERT")
         return result
 
-    def block_user(self, admin_id: str, user_id: str) -> dict:
-        self._require_admin(admin_id)
+    def block_user(self, admin_id: str, user_id: str, actor_role: Optional[str] = None) -> dict:
+        self._require_admin(admin_id, actor_role)
         parse_uuid(user_id)
         target = self._auth.get_user(user_id)
         if target["role"] == "ADMIN":

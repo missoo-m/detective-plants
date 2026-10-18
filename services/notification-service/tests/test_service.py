@@ -22,7 +22,7 @@ def service():
 
 
 def test_filter_and_sort(service):
-    assert [n.type for n in service.list_notifications(U1)] == ["DIAGNOSIS_READY", "REQUEST_CREATED"]   
+    assert [n.type for n in service.list_notifications(U1)] == ["DIAGNOSIS_READY", "REQUEST_CREATED"]  
     assert [n.type for n in service.list_notifications(U1, descending=False)][0] == "REQUEST_CREATED"
     assert [n.message for n in service.list_notifications(U1, status="UNREAD")] == ["Ваша заявка создана"]
     assert len(service.list_notifications(U1, notification_type="DIAGNOSIS_READY")) == 1

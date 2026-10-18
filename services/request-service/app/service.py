@@ -17,6 +17,7 @@ from .utils import fmt_dt, parse_uuid
 
 REQUEST_STATUSES = {"CREATED", "PENDING", "IN_PROGRESS", "DONE", "CANCELLED"}
 ACTIVE_STATUSES = ["CREATED", "PENDING", "IN_PROGRESS"]
+
 TRANSITIONS = {
     "CREATED": {"PENDING", "CANCELLED"},
     "PENDING": {"IN_PROGRESS", "CANCELLED"},
@@ -54,6 +55,12 @@ class RequestService:
         if user["status"] != "ACTIVE":
             raise PermissionDeniedError("Учётная запись пользователя заблокирована или не активна")
         if user["role"] != role:
+            raise PermissionDeniedError(f"Действие доступно только роли {role}")
+
+    def _authorize(self, user_id: str, role: str, actor_role: Optional[str]) -> None:
+        if actor_role is None:
+            self._require_active_user(user_id, role)
+        elif actor_role != role:
             raise PermissionDeniedError(f"Действие доступно только роли {role}")
 
     @staticmethod
@@ -126,7 +133,8 @@ class RequestService:
         with self._session_factory() as session:
             return [_to_disease_dto(d) for d in DiseaseRepository(session).list_all()]
 
-    def create_request(self, client_id: str, symptoms: str, photo_urls: Optional[list] = None) -> RequestDTO:
+    def create_request(self, client_id: str, symptoms: str, photo_urls: Optional[list] = None,
+                       actor_role: Optional[str] = None) -> RequestDTO:
         symptoms = (symptoms or "").strip()
         photo_urls = list(photo_urls or [])
         if not 10 <= len(symptoms) <= 2000:
@@ -135,7 +143,7 @@ class RequestService:
             raise InvalidValueError(f"К заявке можно прикрепить не более {config.MAX_PHOTOS} фото")
         if any(not u.startswith(("http://", "https://")) for u in photo_urls):
             raise InvalidValueError("Ссылка на фото должна начинаться с http:// или https://")
-        self._require_active_user(client_id, "CLIENT")
+        self._authorize(client_id, "CLIENT", actor_role)
         cid = parse_uuid(client_id)
         with self._session_factory() as session:
             repo = RequestRepository(session)
@@ -186,7 +194,7 @@ class RequestService:
             self._change_status(req, "PENDING")
             session.commit()
             result = _to_request_dto(req)
-        self._expert.accept_response(request_id, expert_id)     
+        self._expert.accept_response(request_id, expert_id)      
         return result
 
     def cancel_request(self, request_id: str, client_id: str) -> RequestDTO:
