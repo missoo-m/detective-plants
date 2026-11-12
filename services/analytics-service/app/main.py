@@ -1,17 +1,54 @@
-from .database import init_db
-from .seed import seed, sid
+import argparse
+import logging
+import signal
+import threading
+
+from . import config
+from .database import get_session_factory, init_db
+from .grpc_server import registration
+from .grpc_support import build_server
+from .seed import seed
 from .service import AnalyticsService
+from .events import EventConsumer, KafkaProducer, ensure_topics
+from .handlers import build_handlers
+
+log = logging.getLogger(config.SERVICE_NAME)
 
 
-def main() -> None:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Analytics Service")
+    parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
     init_db()
-    print("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if config.SEED_ON_START or args.init_only:
+        log.info("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if args.init_only:
+        return 0
 
-    service = AnalyticsService()
-    s = service.get_expert_stats(str(sid("user-2")))
-    print(f"\nЭксперт user-2: заявок {s.total_requests}, завершено {s.completed_requests}, рейтинг {s.avg_rating}")
-    print("Болезни за 2026-01:", [(d.disease_id[:8], d.count) for d in service.list_disease_stats("2026-01")])
+    factory = get_session_factory()
+    service = AnalyticsService(factory)
+    registrars, names = registration(service)
+    workers = []
+    ensure_topics()
+    workers.append(EventConsumer(factory, build_handlers(service), dead_letter_producer=KafkaProducer()))
+    for worker in workers:
+        worker.start()
+    server, port = build_server(registrars, config.GRPC_PORT, names, config.INTERNAL_API_KEY)
+    server.start()
+    log.info("%s: gRPC слушает порт %s", config.SERVICE_NAME, port)
+
+    stop = threading.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop.set())
+    stop.wait()
+    log.info("Остановка...")
+    server.stop(5).wait()
+    for worker in workers:
+        worker.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

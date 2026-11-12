@@ -1,19 +1,56 @@
-from .database import init_db
-from .seed import seed, sid
+import argparse
+import logging
+import signal
+import threading
+
+from . import config
+from .database import get_session_factory, init_db
+from .grpc_server import registration
+from .grpc_support import build_server
+from .seed import seed
 from .service import ChatService
+from .events import EventConsumer, KafkaProducer, OutboxRelay, ensure_topics
+from .handlers import build_handlers
+
+log = logging.getLogger(config.SERVICE_NAME)
 
 
-def main() -> None:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Chat Service")
+    parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
     init_db()
-    print("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if config.SEED_ON_START or args.init_only:
+        log.info("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if args.init_only:
+        return 0
 
-    service = ChatService()
-    room = service.get_chat_room_by_request(str(sid("req-2")))
-    print(f"\nЧат {room.status}, сообщений: {len(service.list_messages(room.id))}")
-    for m in service.list_messages(room.id):
-        print(f"  {m.sent_at}: {m.text}")
-    print("Видеокомнат:", len(service.list_video_rooms(room.id)))
+    factory = get_session_factory()
+    service = ChatService(factory)
+    registrars, names = registration(service)
+    workers = []
+    ensure_topics()
+    producer = KafkaProducer()
+    workers.append(OutboxRelay(factory, producer))
+    workers.append(EventConsumer(factory, build_handlers(service), dead_letter_producer=producer))
+    for worker in workers:
+        worker.start()
+    server, port = build_server(registrars, config.GRPC_PORT, names, config.INTERNAL_API_KEY)
+    server.start()
+    log.info("%s: gRPC слушает порт %s", config.SERVICE_NAME, port)
+
+    stop = threading.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop.set())
+    stop.wait()
+    log.info("Остановка...")
+    server.stop(5).wait()
+    for worker in workers:
+        worker.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

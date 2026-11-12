@@ -1,18 +1,54 @@
-from .database import init_db
-from .seed import seed, sid
+import argparse
+import logging
+import signal
+import threading
+
+from . import config
+from .database import get_session_factory, init_db
+from .grpc_server import registration
+from .grpc_support import build_server
+from .seed import seed
 from .service import NotificationService
+from .events import EventConsumer, KafkaProducer, ensure_topics
+from .handlers import build_handlers
+
+log = logging.getLogger(config.SERVICE_NAME)
 
 
-def main() -> None:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Notification Service")
+    parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
     init_db()
-    print("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if config.SEED_ON_START or args.init_only:
+        log.info("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if args.init_only:
+        return 0
 
-    service = NotificationService()
-    user = str(sid("user-1"))
-    print(f"\nНепрочитанных у user-1: {service.count_unread(user)}")
-    for n in service.list_notifications(user):
-        print(f"  [{n.status}] {n.message}")
+    factory = get_session_factory()
+    service = NotificationService(factory)
+    registrars, names = registration(service)
+    workers = []
+    ensure_topics()
+    workers.append(EventConsumer(factory, build_handlers(service), dead_letter_producer=KafkaProducer()))
+    for worker in workers:
+        worker.start()
+    server, port = build_server(registrars, config.GRPC_PORT, names, config.INTERNAL_API_KEY)
+    server.start()
+    log.info("%s: gRPC слушает порт %s", config.SERVICE_NAME, port)
+
+    stop = threading.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop.set())
+    stop.wait()
+    log.info("Остановка...")
+    server.stop(5).wait()
+    for worker in workers:
+        worker.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
