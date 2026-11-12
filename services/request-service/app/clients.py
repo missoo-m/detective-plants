@@ -1,12 +1,8 @@
-import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from .errors import NotFoundError
-
-
-def _sid(name: str) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"plant-detective/{name}"))
+from . import config
+from .grpc_support import ServiceChannel, message_to_dict
 
 
 class AuthClient(ABC):
@@ -19,56 +15,41 @@ class ExpertClient(ABC):
     @abstractmethod
     def has_responded(self, request_id: str, expert_id: str) -> bool: ...
 
-    @abstractmethod
-    def accept_response(self, request_id: str, expert_id: str) -> None: ...
-
-
-class StorageClient(ABC):
-    @abstractmethod
-    def save(self, request_id: str, file_name: str, content: bytes) -> str:
-        pass
-
 
 class AiClient(ABC):
     @abstractmethod
     def prediagnose(self, symptoms: str) -> Optional[str]: ...
 
 
-class MockAuthClient(AuthClient):
-    USERS = {
-        _sid("user-1"): ("CLIENT", "ACTIVE"), _sid("user-2"): ("EXPERT", "ACTIVE"),
-        _sid("user-3"): ("ADMIN", "ACTIVE"), _sid("user-4"): ("CLIENT", "ACTIVE"),
-        _sid("user-5"): ("CLIENT", "BLOCKED"),
-    }
+class GrpcAuthClient(AuthClient):
 
-    def __init__(self, users: Optional[dict] = None):
-        self.users = dict(users if users is not None else self.USERS)
+    def __init__(self, target: Optional[str] = None, channel: Optional[ServiceChannel] = None):
+        from .proto import auth_pb2 as pb, auth_pb2_grpc as pb_grpc
+        self._pb = pb
+        self._channel = channel or ServiceChannel(target or config.AUTH_GRPC_ADDR, "auth-service")
+        self._stub = self._channel.stub(pb_grpc.AuthServiceStub)
 
     def get_user(self, user_id: str) -> dict:
-        if user_id not in self.users:
-            raise NotFoundError(f"Пользователь {user_id} не найден")
-        role, status = self.users[user_id]
-        return {"id": user_id, "role": role, "status": status}
+        reply = self._channel.call(self._stub.GetUser, self._pb.GetUserRequest(user_id=user_id), idempotent=True)
+        data = message_to_dict(reply)
+        return {"id": data["id"], "role": data["role"], "status": data["status"]}
 
 
-class MockExpertClient(ExpertClient):
-    def __init__(self, responded: Optional[set] = None):
-        self.responded = set(responded or set())    
-        self.accepted: list = []
+class GrpcExpertClient(ExpertClient):
+
+    def __init__(self, target: Optional[str] = None, channel: Optional[ServiceChannel] = None):
+        from .proto import expert_pb2 as pb, expert_pb2_grpc as pb_grpc
+        self._pb = pb
+        self._channel = channel or ServiceChannel(target or config.EXPERT_GRPC_ADDR, "expert-service")
+        self._stub = self._channel.stub(pb_grpc.ExpertServiceStub)
 
     def has_responded(self, request_id: str, expert_id: str) -> bool:
-        return (request_id, expert_id) in self.responded
-
-    def accept_response(self, request_id: str, expert_id: str) -> None:
-        self.accepted.append((request_id, expert_id))
-
-
-class MockStorageClient(StorageClient):
-    def save(self, request_id: str, file_name: str, content: bytes) -> str:
-        return f"https://minio/{request_id}/{uuid.uuid4().hex[:8]}-{file_name}"
+        reply = self._channel.call(self._stub.ListResponses, self._pb.ListResponsesRequest(request_id=request_id),
+                                   idempotent=True)
+        return any(r.expert_id == expert_id for r in reply.responses)
 
 
-class MockAiClient(AiClient):
+class KeywordAiClassifier(AiClient):
     RULES = [("налёт", "Мучнистая роса"), ("гниль", "Корневая гниль"), ("пятна", "Пятнистость листьев")]
 
     def prediagnose(self, symptoms: str) -> Optional[str]:

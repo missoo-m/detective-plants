@@ -1,11 +1,8 @@
-import uuid
 from abc import ABC, abstractmethod
+from typing import Optional
 
-
-class RequestClient(ABC):
-    @abstractmethod
-    def complete_request(self, request_id: str) -> None:
-        pass
+from . import config
+from .grpc_support import ServiceChannel
 
 
 class NotificationClient(ABC):
@@ -13,27 +10,14 @@ class NotificationClient(ABC):
     def send(self, user_id: str, notification_type: str, message: str) -> None: ...
 
 
-class StorageClient(ABC):
-    @abstractmethod
-    def save(self, folder: str, file_name: str, content: bytes) -> str: ...
+class GrpcNotificationClient(NotificationClient):
 
-
-class MockRequestClient(RequestClient):
-    def __init__(self):
-        self.completed: list = []
-
-    def complete_request(self, request_id: str) -> None:
-        self.completed.append(request_id)
-
-
-class MockNotificationClient(NotificationClient):
-    def __init__(self):
-        self.sent: list = []
+    def __init__(self, target: Optional[str] = None, channel: Optional[ServiceChannel] = None):
+        from .proto import notification_pb2 as pb, notification_pb2_grpc as pb_grpc
+        self._pb = pb
+        self._channel = channel or ServiceChannel(target or config.NOTIFICATION_GRPC_ADDR, "notification-service")
+        self._stub = self._channel.stub(pb_grpc.NotificationServiceStub)
 
     def send(self, user_id: str, notification_type: str, message: str) -> None:
-        self.sent.append((user_id, notification_type, message))
-
-
-class MockStorageClient(StorageClient):
-    def save(self, folder: str, file_name: str, content: bytes) -> str:
-        return f"https://minio/{folder}/{uuid.uuid4().hex[:8]}-{file_name}"
+        self._channel.call(self._stub.SendNotification, self._pb.SendNotificationRequest(
+            user_id=user_id, type=notification_type, message=message))
