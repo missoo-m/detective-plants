@@ -3,6 +3,7 @@ from typing import Optional
 
 from ..errors import NotFoundError  
 
+
 class AuthClientBase(ABC):
     @abstractmethod
     def get_user(self, user_id: str) -> dict: ...
@@ -67,19 +68,10 @@ class RequestClientBase(ABC):
     @abstractmethod
     def cancel_request(self, request_id: str, client_id: str) -> dict: ...
 
-    @abstractmethod
-    def start_work(self, request_id: str) -> dict: ...
-
-    @abstractmethod
-    def complete_request(self, request_id: str) -> dict: ...
-
 
 class ExpertClientBase(ABC):
     @abstractmethod
     def list_responses(self, request_id: str) -> list[dict]: ...
-
-    @abstractmethod
-    def has_responded(self, request_id: str, expert_id: str) -> bool: ...
 
     @abstractmethod
     def responses_summary(self, expert_id: str) -> dict: ...
@@ -87,9 +79,6 @@ class ExpertClientBase(ABC):
     @abstractmethod
     def respond_to_request(self, request_id: str, expert_id: str, comment: Optional[str],
                            actor_role: Optional[str] = None) -> dict: ...
-
-    @abstractmethod
-    def accept_response(self, request_id: str, expert_id: str) -> None: ...
 
     @abstractmethod
     def get_diagnosis(self, diagnosis_id: str) -> dict: ...
@@ -117,9 +106,6 @@ class RecoveryClientBase(ABC):
     def tracker_progress(self, tracker_id: str) -> dict: ...
 
     @abstractmethod
-    def create_tracker(self, request_id: str, client_id: str, expert_id: str, duration_days: int) -> dict: ...
-
-    @abstractmethod
     def upload_photo(self, tracker_id: str, author_id: str, file_name: str, content: bytes) -> dict: ...
 
     @abstractmethod
@@ -144,9 +130,6 @@ class ChatClientBase(ABC):
 
     @abstractmethod
     def unread_count(self, chat_room_id: str, user_id: str) -> int: ...
-
-    @abstractmethod
-    def open_room(self, request_id: str, client_id: str, expert_id: str) -> dict: ...
 
     @abstractmethod
     def send_message(self, chat_room_id: str, sender_id: str, text: Optional[str],
@@ -201,9 +184,6 @@ class NotificationClientBase(ABC):
 
     @abstractmethod
     def notifications_summary(self, user_id: str) -> dict: ...
-
-    @abstractmethod
-    def create_notification(self, user_id: str, notification_type: str, message: str) -> dict: ...
 
     @abstractmethod
     def mark_read(self, notification_id: str, user_id: str) -> dict: ...

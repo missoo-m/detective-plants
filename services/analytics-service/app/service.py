@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from .database import get_session_factory
 from .errors import InvalidValueError, NotFoundError
 from .repository import EXPERT_SORT, StatsRepository
-from .schemas import DiseaseStatsDTO, ExpertStatsDTO, PlatformSummaryDTO
+from .schemas import DiseaseStatsDTO, EventCounterDTO, ExpertStatsDTO, PlatformSummaryDTO
 from .utils import parse_uuid
 
 
@@ -44,6 +44,11 @@ class AnalyticsService:
         with self._session_factory() as session:
             return [DiseaseStatsDTO(disease_id=str(s.disease_id), count=s.count or 0, period=s.period)
                     for s in StatsRepository(session).list_disease_stats(period, descending, limit)]
+
+    def event_counters(self, period: Optional[str] = None) -> list[EventCounterDTO]:
+        with self._session_factory() as session:
+            return [EventCounterDTO(event_type=c.event_type, period=c.period, count=c.count or 0, amount=c.amount or 0.0)
+                    for c in StatsRepository(session).list_counters(period)]
 
     def platform_summary(self) -> PlatformSummaryDTO:
         with self._session_factory() as session:

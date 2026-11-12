@@ -4,40 +4,42 @@ PUBLIC = "PUBLIC"
 AUTHENTICATED = "AUTHENTICATED"
 
 POLICY: dict = {
+    #  Query
     "Query.me": AUTHENTICATED,
-    "Query.user": AUTHENTICATED,                         # объект: свой профиль или администратор
+    "Query.user": AUTHENTICATED,                         
     "Query.users": frozenset({ADMIN}),
     "Query.usersSummary": frozenset({ADMIN}),
-    "Query.request": AUTHENTICATED,                      # объект: автор, назначенный эксперт, админ; очередь — эксперты
+    "Query.request": AUTHENTICATED,                      
     "Query.myRequests": frozenset({CLIENT}),
     "Query.availableRequests": frozenset({EXPERT, ADMIN}),
-    "Query.requestsByExpert": frozenset({EXPERT, ADMIN}),    # область: эксперт видит только свои
-    "Query.requestsSummary": AUTHENTICATED,              # область: данные ограничиваются ролью
-    "Query.diagnosis": AUTHENTICATED,                    # объект: участники заявки и админ
+    "Query.requestsByExpert": frozenset({EXPERT, ADMIN}),    
+    "Query.requestsSummary": AUTHENTICATED,              
+    "Query.diagnosis": AUTHENTICATED,                    
     "Query.diagnosisByRequest": AUTHENTICATED,
-    "Query.responsesSummary": frozenset({EXPERT, ADMIN}),    # область: эксперт — только свои
-    "Query.tracker": AUTHENTICATED,                      # объект: участники заявки и админ
+    "Query.responsesSummary": frozenset({EXPERT, ADMIN}),    
+    "Query.tracker": AUTHENTICATED,                      
     "Query.trackerByRequest": AUTHENTICATED,
     "Query.trackerProgress": AUTHENTICATED,
-    "Query.chatRoom": AUTHENTICATED,                     # объект: только участники чата
+    "Query.chatRoom": AUTHENTICATED,                    
     "Query.chatRoomByRequest": AUTHENTICATED,
     "Query.chatUnreadCount": AUTHENTICATED,
-    "Query.notifications": AUTHENTICATED,                # всегда свои
+    "Query.notifications": AUTHENTICATED,                
     "Query.notificationsSummary": AUTHENTICATED,
-    "Query.transactions": AUTHENTICATED,                 # область: клиент — свои платежи, эксперт — по своим заявкам
+    "Query.transactions": AUTHENTICATED,                 
     "Query.transactionsSummary": AUTHENTICATED,
-    "Query.withdrawals": frozenset({EXPERT, ADMIN}),         # область: эксперт — только свои
-    "Query.expertBalance": frozenset({EXPERT, ADMIN}),       # область: эксперт — только свой
+    "Query.withdrawals": frozenset({EXPERT, ADMIN}),      
+    "Query.expertBalance": frozenset({EXPERT, ADMIN}),     
     "Query.expertApplications": frozenset({ADMIN}),
     "Query.applicationsSummary": frozenset({ADMIN}),
-    "Query.expertStats": frozenset({EXPERT, ADMIN}),         # область: эксперт — только своя
+    "Query.expertStats": frozenset({EXPERT, ADMIN}),         
     "Query.topExperts": AUTHENTICATED,
     "Query.diseaseStats": AUTHENTICATED,
     "Query.platformSummary": frozenset({ADMIN}),
     "Query.myFields": frozenset({CLIENT}),
-    "Query.satelliteField": AUTHENTICATED,               # объект: владелец или админ
+    "Query.satelliteField": AUTHENTICATED,               
     "Query.satelliteAlerts": frozenset({CLIENT, ADMIN}),
     "Query.fieldNdviSummary": AUTHENTICATED,
+    #  Mutation
     "Mutation.register": PUBLIC,
     "Mutation.login": PUBLIC,
     "Mutation.logout": AUTHENTICATED,
@@ -56,10 +58,10 @@ POLICY: dict = {
     "Mutation.uploadTrackerPhoto": frozenset({CLIENT}),
     "Mutation.updateTreatment": frozenset({EXPERT}),
     "Mutation.completeTracker": frozenset({EXPERT}),
-    "Mutation.sendMessage": AUTHENTICATED,               # объект: только участники чата
+    "Mutation.sendMessage": AUTHENTICATED,         
     "Mutation.markMessageRead": AUTHENTICATED,
     "Mutation.createVideoRoom": frozenset({EXPERT}),
-    "Mutation.markNotificationRead": AUTHENTICATED,      # объект: только своё уведомление
+    "Mutation.markNotificationRead": AUTHENTICATED,    
     "Mutation.markAllNotificationsRead": AUTHENTICATED,
     "Mutation.verifyExpert": frozenset({ADMIN}),
     "Mutation.blockUser": frozenset({ADMIN}),

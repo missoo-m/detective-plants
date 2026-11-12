@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 @dataclass
 class ExpertStatsDTO:
     expert_id: str
@@ -21,5 +20,12 @@ class PlatformSummaryDTO:
     experts: int
     total_requests: int
     completed_requests: int
-    completion_rate: float      
+    completion_rate: float     
     avg_rating: float           
+
+@dataclass
+class EventCounterDTO:
+    event_type: str
+    period: str
+    count: int
+    amount: float

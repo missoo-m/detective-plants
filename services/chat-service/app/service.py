@@ -4,6 +4,7 @@ from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
 from .database import get_session_factory
+from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import ChatRoom, Message, ModerationLog, ModerationRule, VideoRoom, utcnow
 from .repository import ChatRepository, ModerationRepository
@@ -132,13 +133,19 @@ class ChatService:
                 raise BusinessRuleError("Чат закрыт, отправка сообщений невозможна")
             verdict = self.moderate(session, sender, text)
             if not verdict.allowed:
-                session.commit()                                  
+                session.commit()
                 raise BusinessRuleError(f"Сообщение заблокировано модерацией: {verdict.rule_name}")
             message = Message(chat_room_id=room.id, sender_id=sender, text=text,
                               attachment_url=attachment_url, is_read=False)
             repo.add(message)
+            session.flush()
+            result = _message(message)
+            recipient = room.expert_id if sender == room.client_id else room.client_id
+            add_event(session, "MessageSent", {
+                "message_id": result.id, "chat_room_id": str(room.id), "request_id": str(room.request_id),
+                "sender_id": sender_id, "recipient_id": str(recipient), "text": text, "sent_at": result.sent_at})
             session.commit()
-            return _message(message)
+            return result
 
     def mark_read(self, message_id: str, reader_id: str) -> MessageDTO:
         with self._session_factory() as session:
@@ -166,7 +173,7 @@ class ChatService:
                 raise BusinessRuleError("Предыдущая видеоконсультация ещё не завершена")
             video = VideoRoom(chat_room_id=room.id, room_url="", status="CREATED")
             repo.add(video)
-            session.flush()                                       # получаем id для ссылки
+            session.flush()
             video.room_url = f"https://meet.example/room/{video.id}"
             session.commit()
             return _video(video)

@@ -20,6 +20,10 @@ class SessionManager:
         self._secret, self._issuer = secret, issuer
         self._jwt_ttl, self._session_ttl, self._sliding, self._clock = jwt_ttl, session_ttl, sliding, clock
 
+    @property
+    def directory(self):
+        return self._directory
+
     def register(self, email: str, password: str, name: str) -> dict:
         return _as_dict(self._directory.register(email, password, name))
 

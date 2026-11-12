@@ -1,16 +1,20 @@
 from datetime import datetime
+import logging
 from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
-from .clients import AuthClient, MockAuthClient
+from .clients import AuthClient, GrpcAuthClient
 from .database import get_session_factory
-from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
+from .errors import (BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError,
+                     ServiceUnavailableError)
+from .events import add_event
 from .models import ExpertApplication, utcnow
 from .repository import ApplicationRepository
 from .schemas import ApplicationDTO, ApplicationsSummaryDTO
 from .utils import fmt_dt, parse_uuid
 
+log = logging.getLogger("admin")
 APPLICATION_STATUSES = {"PENDING", "APPROVED", "REJECTED"}
 
 
@@ -22,7 +26,7 @@ def _dto(a: ExpertApplication) -> ApplicationDTO:
 class AdminService:
     def __init__(self, session_factory: Optional[Callable[[], Session]] = None, auth: Optional[AuthClient] = None):
         self._session_factory = session_factory or get_session_factory()
-        self._auth = auth or MockAuthClient()
+        self._auth = auth or GrpcAuthClient()
 
     def _require_admin(self, admin_id: str, actor_role: Optional[str] = None) -> None:
         if actor_role is not None:
@@ -91,10 +95,16 @@ class AdminService:
                 raise BusinessRuleError(f"Заявка уже рассмотрена (статус {app.status})")
             app.status = "APPROVED" if approve else "REJECTED"
             app.verified_at = utcnow()
-            session.commit()
             result, user_id = _dto(app), str(app.user_id)
+            if approve:                                   
+                add_event(session, "ExpertVerified", {"application_id": result.id, "user_id": user_id,
+                                                      "admin_id": admin_id, "verified_at": result.verified_at})
+            session.commit()
         if approve:
-            self._auth.assign_role(user_id, "EXPERT")
+            try:                                         
+                self._auth.assign_role(user_id, "EXPERT")
+            except ServiceUnavailableError as error:      
+                log.warning("Auth Service недоступен, роль EXPERT будет выдана по событию: %s", error)
         return result
 
     def block_user(self, admin_id: str, user_id: str, actor_role: Optional[str] = None) -> dict:
@@ -105,5 +115,9 @@ class AdminService:
             raise BusinessRuleError("Администратора заблокировать нельзя")
         if target["status"] == "BLOCKED":
             raise BusinessRuleError("Пользователь уже заблокирован")
-        self._auth.set_status(user_id, "BLOCKED")
+        self._auth.set_status(user_id, "BLOCKED")             
+        with self._session_factory() as session:
+            add_event(session, "UserBlocked", {"user_id": user_id, "admin_id": admin_id,
+                                               "blocked_at": fmt_dt(utcnow())})
+            session.commit()
         return {"user_id": user_id, "status": "BLOCKED"}

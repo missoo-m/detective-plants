@@ -27,15 +27,15 @@ class WithdrawalDTO:
 class TransactionsSummaryDTO:
     count: int
     total_amount: float
-    by_status: dict            
-    by_type: dict              
+    by_status: dict
+    by_type: dict
 
 
 @dataclass
 class BalanceDTO:
     expert_id: str
-    earned: float              
-    commission: float         
-    withdrawn: float        
-    pending: float             
+    earned: float
+    commission: float
+    withdrawn: float
+    pending: float
     available: float

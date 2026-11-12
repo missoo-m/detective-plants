@@ -35,4 +35,4 @@ class NdviSummaryDTO:
     max_value: float
     avg_value: float
     last_value: float
-    trend: float            
+    trend: float

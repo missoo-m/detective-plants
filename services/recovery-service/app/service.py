@@ -1,18 +1,22 @@
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
-from .clients import MockNotificationClient, MockRequestClient, MockStorageClient, \
-    NotificationClient, RequestClient, StorageClient
+from .clients import GrpcNotificationClient, NotificationClient
 from .database import get_session_factory
-from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
+from .errors import (BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError,
+                     ServiceUnavailableError)
+from .events import add_event
 from .models import RecoveryTracker, TreatmentHistory, utcnow
 from .repository import SORT_COLUMNS, TrackerRepository
+from .storage import MinioStorage, StorageClient
 from .schemas import HistoryDTO, ProgressDTO, TrackerDTO
 from .utils import fmt_dt, parse_uuid
 
+log = logging.getLogger("recovery")
 TRACKER_STATUSES = {"ACTIVE", "COMPLETED", "CANCELLED"}
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -32,12 +36,10 @@ def _history(h: TreatmentHistory) -> HistoryDTO:
 
 class RecoveryService:
     def __init__(self, session_factory: Optional[Callable[[], Session]] = None,
-                 requests: Optional[RequestClient] = None, notifications: Optional[NotificationClient] = None,
-                 storage: Optional[StorageClient] = None):
+                 notifications: Optional[NotificationClient] = None, storage: Optional[StorageClient] = None):
         self._session_factory = session_factory or get_session_factory()
-        self._requests = requests or MockRequestClient()
-        self._notifications = notifications or MockNotificationClient()
-        self._storage = storage or MockStorageClient()
+        self._notifications = notifications or GrpcNotificationClient()
+        self._storage = storage or MinioStorage()
 
     @staticmethod
     def _load(repo: TrackerRepository, tracker_id: str) -> RecoveryTracker:
@@ -102,8 +104,13 @@ class RecoveryService:
                                       end_date=start + timedelta(days=duration_days), status="ACTIVE",
                                       current_stage="START")
             repo.add(tracker)
+            session.flush()
+            result = _to_dto(tracker)
+            add_event(session, "TrackerCreated", {
+                "tracker_id": result.id, "request_id": request_id, "client_id": client_id, "expert_id": expert_id,
+                "start_date": result.start_date, "end_date": result.end_date, "duration_days": duration_days})
             session.commit()
-            return _to_dto(tracker)
+            return result
 
     def upload_photo(self, tracker_id: str, author_id: str, file_name: str, content: bytes) -> HistoryDTO:
         ext = os.path.splitext(file_name or "")[1].lower()
@@ -121,11 +128,14 @@ class RecoveryService:
             record = TreatmentHistory(tracker_id=tracker.id, record_type="PHOTO", author_id=tracker.client_id,
                                       photo_url=self._storage.save(str(tracker.id), file_name, content))
             session.add(record)
-            session.commit()
-            expert_id = str(tracker.expert_id)
+            session.flush()
             result = _history(record)
-        self._notifications.send(expert_id, "TRACKER_PHOTO", "Клиент загрузил новое фото растения в трекер")
-        return result
+            add_event(session, "PhotoUploaded", {
+                "tracker_id": str(tracker.id), "request_id": str(tracker.request_id), "client_id": author_id,
+                "expert_id": str(tracker.expert_id), "history_id": result.id, "photo_url": result.photo_url,
+                "uploaded_at": result.date})
+            session.commit()
+            return result
 
     def update_treatment(self, tracker_id: str, expert_id: str, change_description: str,
                          new_stage: Optional[str] = None) -> HistoryDTO:
@@ -144,10 +154,18 @@ class RecoveryService:
             if new_stage is not None:
                 tracker.current_stage = new_stage.strip()
             session.add(record)
-            session.commit()
+            session.flush()
             client_id = str(tracker.client_id)
             result = _history(record)
-        self._notifications.send(client_id, "TREATMENT_UPDATED", "Эксперт скорректировал план лечения")
+            add_event(session, "TreatmentUpdated", {
+                "tracker_id": str(tracker.id), "request_id": str(tracker.request_id), "client_id": client_id,
+                "expert_id": expert_id, "history_id": result.id, "change_description": text,
+                "new_stage": tracker.current_stage, "updated_at": result.date})
+            session.commit()
+        try:
+            self._notifications.send(client_id, "TREATMENT_UPDATED", "Эксперт скорректировал план лечения")
+        except ServiceUnavailableError as error:
+            log.warning("Уведомление о корректировке лечения не отправлено: %s", error)
         return result
 
     def complete_tracker(self, tracker_id: str, expert_id: str) -> TrackerDTO:
@@ -159,8 +177,9 @@ class RecoveryService:
             tracker.status = "COMPLETED"
             tracker.end_date = utcnow()
             tracker.current_stage = "COMPLETED"
-            session.commit()
             result = _to_dto(tracker)
-            request_id = str(tracker.request_id)
-        self._requests.complete_request(request_id)
-        return result
+            add_event(session, "TrackerCompleted", {
+                "tracker_id": result.id, "request_id": str(tracker.request_id), "client_id": str(tracker.client_id),
+                "expert_id": expert_id, "completed_at": result.end_date})
+            session.commit()
+            return result

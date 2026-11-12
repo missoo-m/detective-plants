@@ -4,8 +4,18 @@ APP_TITLE = "Detective Plants — GraphQL Gateway"
 HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 PORT = int(os.getenv("GATEWAY_PORT", "8000"))
 
-AUTH_MODE = os.getenv("GATEWAY_AUTH_MODE", "mock")                              
-AUTH_SERVICE_URL = os.getenv("GATEWAY_AUTH_SERVICE_URL", "http://localhost:8001")
-AUTH_TIMEOUT_SECONDS = float(os.getenv("GATEWAY_AUTH_TIMEOUT", "3"))
-MOCK_JWT_SECRET = os.getenv("GATEWAY_MOCK_JWT_SECRET", "mock-secret-change-me")   # только для режима mock
-MOCK_SESSION_TTL = int(os.getenv("GATEWAY_MOCK_SESSION_TTL", "1800"))
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "dev-internal-key")      
+GRPC_TIMEOUT_SECONDS = float(os.getenv("GATEWAY_GRPC_TIMEOUT", "5"))
+
+SERVICE_ADDRESSES = {
+    "auth": os.getenv("AUTH_GRPC_ADDR", "localhost:50051"),
+    "request": os.getenv("REQUEST_GRPC_ADDR", "localhost:50052"),
+    "expert": os.getenv("EXPERT_GRPC_ADDR", "localhost:50053"),
+    "recovery": os.getenv("RECOVERY_GRPC_ADDR", "localhost:50054"),
+    "chat": os.getenv("CHAT_GRPC_ADDR", "localhost:50055"),
+    "payment": os.getenv("PAYMENT_GRPC_ADDR", "localhost:50056"),
+    "notification": os.getenv("NOTIFICATION_GRPC_ADDR", "localhost:50057"),
+    "analytics": os.getenv("ANALYTICS_GRPC_ADDR", "localhost:50058"),
+    "admin": os.getenv("ADMIN_GRPC_ADDR", "localhost:50059"),
+    "satellite": os.getenv("SATELLITE_GRPC_ADDR", "localhost:50060"),
+}

@@ -98,14 +98,14 @@ def test_verify_returns_identity(manager):
 
 def test_valid_jwt_without_session_is_rejected(manager, store):
     result = manager.login("anna@example.com", "password123")
-    store.delete(result["session_id"])                                   #
+    store.delete(result["session_id"])                                 
     with pytest.raises(AuthenticationError, match="Сессия"):
         manager.verify(result["access_token"])
 
 
 def test_session_expires_after_ttl_even_if_jwt_is_valid(manager, clock):
     token = manager.login("anna@example.com", "password123")["access_token"]
-    clock.now += 601                                                     # TTL сессии 600 с, JWT ещё жив (3600 с)
+    clock.now += 601                                                   
     with pytest.raises(AuthenticationError, match="Сессия"):
         manager.verify(token)
 
@@ -113,7 +113,7 @@ def test_session_expires_after_ttl_even_if_jwt_is_valid(manager, clock):
 def test_sliding_session_extends_on_activity(manager, clock):
     token = manager.login("anna@example.com", "password123")["access_token"]
     for _ in range(3):
-        clock.now += 400                                                 # каждое обращение продлевает сессию
+        clock.now += 400                                                
         assert manager.verify(token)["user_id"] == "u-1"
     clock.now += 700
     with pytest.raises(AuthenticationError):

@@ -39,6 +39,7 @@ def read_upload(file) -> tuple:
 
 @strawberry.type
 class Mutation:
+    # аккаунт (Auth Service по gRPC)
     @_mutation("Mutation.register")
     def register(self, input: RegisterInput) -> AuthPayload:
         clients.security_client.register(input.email, input.password, input.name)
@@ -46,12 +47,10 @@ class Mutation:
 
     @_mutation("Mutation.login")
     def login(self, input: LoginInput) -> AuthPayload:
-        #Auth Service проверяет пароль, создаёт сессию в Redis и выдаёт JWT
         return to_auth_payload(clients.security_client.login(input.email, input.password))
 
     @_mutation("Mutation.logout")
     def logout(self, info: Info) -> bool:
-        #Выход: сессия удаляется из Redis, токен перестаёт действовать
         token = info.context.get("token")
         if not token:
             raise AuthenticationError("Токен не передан")
@@ -67,6 +66,7 @@ class Mutation:
     def apply_for_expert(self, info: Info, input: ApplyForExpertInput) -> ExpertApplication:
         return to_application(clients.admin_client.submit_application(_actor(info), input.documents_url, _role(info)))
 
+    # заявки
     @_mutation("Mutation.createRequest")
     def create_request(self, info: Info, input: CreateRequestInput) -> Request:
         return to_request(clients.request_client.create_request(_actor(info), input.symptoms, input.photo_urls,
@@ -90,6 +90,7 @@ class Mutation:
     def cancel_request(self, info: Info, request_id: strawberry.ID) -> Request:
         return to_request(clients.request_client.cancel_request(request_id, _actor(info)))
 
+    # оплата и вывод средств
     @_mutation("Mutation.createPayment")
     def create_payment(self, info: Info, input: CreatePaymentInput) -> Transaction:
         return to_transaction(clients.payment_client.create_payment(
@@ -103,6 +104,7 @@ class Mutation:
     def approve_withdrawal(self, info: Info, withdrawal_id: strawberry.ID) -> Withdrawal:
         return to_withdrawal(clients.payment_client.approve_withdrawal(withdrawal_id, _actor(info), _role(info)))
 
+    # диагностика и лечение
     @_mutation("Mutation.createDiagnosis")
     def create_diagnosis(self, info: Info, input: CreateDiagnosisInput) -> Diagnosis:
         checklist = [{"step": s.step, "frequency": s.frequency, "duration_days": s.duration_days}
@@ -130,6 +132,7 @@ class Mutation:
     def complete_tracker(self, info: Info, tracker_id: strawberry.ID) -> RecoveryTracker:
         return to_tracker(clients.recovery_client.complete_tracker(tracker_id, _actor(info)))
 
+    #  общение
     @_mutation("Mutation.sendMessage")
     def send_message(self, info: Info, input: SendMessageInput) -> Message:
         return to_message(clients.chat_client.send_message(input.chat_room_id, _actor(info), input.text,
@@ -143,6 +146,7 @@ class Mutation:
     def create_video_room(self, info: Info, chat_room_id: strawberry.ID) -> VideoRoom:
         return to_video_room(clients.chat_client.create_video_room(chat_room_id, _actor(info)))
 
+    #  уведомления
     @_mutation("Mutation.markNotificationRead")
     def mark_notification_read(self, info: Info, notification_id: strawberry.ID) -> Notification:
         return to_notification(clients.notification_client.mark_read(notification_id, _actor(info)))
@@ -151,6 +155,7 @@ class Mutation:
     def mark_all_notifications_read(self, info: Info) -> int:
         return clients.notification_client.mark_all_read(_actor(info))
 
+    # администрирование
     @_mutation("Mutation.verifyExpert")
     def verify_expert(self, info: Info, application_id: strawberry.ID, approve: bool) -> ExpertApplication:
         return to_application(clients.admin_client.verify_expert(application_id, _actor(info), approve, _role(info)))
@@ -160,6 +165,7 @@ class Mutation:
         clients.admin_client.block_user(_actor(info), user_id, _role(info))
         return to_user(clients.auth_client.get_user(user_id))
 
+    #  спутниковый мониторинг
     @_mutation("Mutation.createField")
     def create_field(self, info: Info, input: CreateFieldInput) -> SatelliteField:
         return to_field(clients.satellite_client.create_field(_actor(info), input.name, input.geometry))

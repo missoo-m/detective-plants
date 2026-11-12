@@ -25,7 +25,7 @@ class FieldRepository:
 
     def name_exists(self, owner_id: uuid.UUID, name: str) -> bool:
         names = self.session.scalars(select(Field.name).where(Field.owner_id == owner_id)).all()
-        return any(n.lower() == name.lower() for n in names)     
+        return any(n.lower() == name.lower() for n in names)
 
     def list_measurements(self, field_id: uuid.UUID, descending: bool = False,
                           limit: Optional[int] = None) -> list[NdviMeasurement]:

@@ -18,7 +18,7 @@ def build_context(authorization: Optional[str]) -> dict:
     try:
         identity = clients.security_client.verify(context["token"])
     except AuthenticationError as error:
-        context["auth_error"] = error.message          
+        context["auth_error"] = error.message        
         return context
     context["identity"], context["current_user_id"] = identity, identity.user_id
     return context

@@ -103,7 +103,7 @@ class RedisSessionStore(SessionStore):
         return session
 
     def get(self, session_id: str) -> Optional[Session]:
-        raw = self._r.get(self._key(session_id))     
+        raw = self._r.get(self._key(session_id))    
         return Session.from_json(raw) if raw else None
 
     def touch(self, session_id: str, ttl: int) -> bool:

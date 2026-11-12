@@ -1,23 +1,22 @@
 import os
-import uuid
 from datetime import datetime
 from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
 from . import config
-from .clients import AiClient, AuthClient, ExpertClient, MockAiClient, MockAuthClient, MockExpertClient, \
-    MockStorageClient, StorageClient
+from .clients import AiClient, AuthClient, ExpertClient, GrpcAuthClient, GrpcExpertClient, KeywordAiClassifier
 from .database import get_session_factory
+from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import Disease, Request, RequestPhoto, utcnow
 from .repository import SORT_COLUMNS, DiseaseRepository, RequestRepository
+from .storage import MinioStorage, StorageClient
 from .schemas import DiseaseDTO, PhotoDTO, RequestDetailsDTO, RequestDTO, RequestsSummaryDTO
 from .utils import fmt_dt, parse_uuid
 
 REQUEST_STATUSES = {"CREATED", "PENDING", "IN_PROGRESS", "DONE", "CANCELLED"}
 ACTIVE_STATUSES = ["CREATED", "PENDING", "IN_PROGRESS"]
-
 TRANSITIONS = {
     "CREATED": {"PENDING", "CANCELLED"},
     "PENDING": {"IN_PROGRESS", "CANCELLED"},
@@ -45,10 +44,10 @@ class RequestService:
                  expert: Optional[ExpertClient] = None, storage: Optional[StorageClient] = None,
                  ai: Optional[AiClient] = None):
         self._session_factory = session_factory or get_session_factory()
-        self._auth = auth or MockAuthClient()
-        self._expert = expert or MockExpertClient()
-        self._storage = storage or MockStorageClient()
-        self._ai = ai or MockAiClient()
+        self._auth = auth or GrpcAuthClient()
+        self._expert = expert or GrpcExpertClient()
+        self._storage = storage or MinioStorage()
+        self._ai = ai or KeywordAiClassifier()
 
     def _require_active_user(self, user_id: str, role: str) -> None:
         user = self._auth.get_user(user_id)
@@ -155,6 +154,11 @@ class RequestService:
                           ai_prediagnosis=self._ai.prediagnose(symptoms))
             req.photos = [RequestPhoto(url=u) for u in photo_urls]
             repo.add(req)
+            session.flush()
+            add_event(session, "RequestCreated", {
+                "request_id": str(req.id), "client_id": client_id, "symptoms": symptoms,
+                "photo_count": len(photo_urls), "ai_prediagnosis": req.ai_prediagnosis,
+                "created_at": fmt_dt(req.created_at)})
             session.commit()
             return _to_request_dto(req)
 
@@ -192,10 +196,10 @@ class RequestService:
                 raise BusinessRuleError("Этот эксперт не откликался на заявку")
             req.expert_id = parse_uuid(expert_id)
             self._change_status(req, "PENDING")
+            add_event(session, "ExpertSelected", {"request_id": request_id, "client_id": client_id,
+                                                  "expert_id": expert_id, "selected_at": fmt_dt(utcnow())})
             session.commit()
-            result = _to_request_dto(req)
-        self._expert.accept_response(request_id, expert_id)      
-        return result
+            return _to_request_dto(req)
 
     def cancel_request(self, request_id: str, client_id: str) -> RequestDTO:
         with self._session_factory() as session:
@@ -219,6 +223,24 @@ class RequestService:
     def complete_request(self, request_id: str) -> RequestDTO:
         with self._session_factory() as session:
             req = self._load(RequestRepository(session), request_id)
+            self._change_status(req, "DONE")
+            session.commit()
+            return _to_request_dto(req)
+
+    def apply_payment(self, request_id: str) -> Optional[RequestDTO]:
+        with self._session_factory() as session:
+            req = self._load(RequestRepository(session), request_id)
+            if req.status != "PENDING":
+                return None
+            self._change_status(req, "IN_PROGRESS")
+            session.commit()
+            return _to_request_dto(req)
+
+    def apply_tracker_completed(self, request_id: str) -> Optional[RequestDTO]:
+        with self._session_factory() as session:
+            req = self._load(RequestRepository(session), request_id)
+            if req.status != "IN_PROGRESS":
+                return None
             self._change_status(req, "DONE")
             session.commit()
             return _to_request_dto(req)

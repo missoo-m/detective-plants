@@ -54,7 +54,7 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
     app = FastAPI(title="Auth Service")
     holder = {"manager": manager}
 
-    def mgr() -> SessionManager:                    
+    def mgr() -> SessionManager:                     
         if holder["manager"] is None:
             holder["manager"] = build_manager()
         return holder["manager"]
@@ -104,7 +104,7 @@ def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
     def set_role(user_id: str, body: ValueBody, x_internal_key: Optional[str] = Header(default=None)):
         _internal(x_internal_key)
         user = mgr()._directory.assign_role(user_id, body.value)
-        return {"user_id": user.id, "role": user.role}          
+        return {"user_id": user.id, "role": user.role}          # роль берётся из БД при каждой проверке токена
 
     return app
 

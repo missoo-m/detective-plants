@@ -26,3 +26,7 @@ class BusinessRuleError(DomainError):
 
 class AuthenticationError(DomainError):
     code = "UNAUTHENTICATED"
+
+
+class ServiceUnavailableError(DomainError):
+    code = "SERVICE_UNAVAILABLE"

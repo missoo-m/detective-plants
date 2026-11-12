@@ -10,8 +10,15 @@ class InvalidValueError(ServiceError, ValueError):
     pass
 
 class PermissionDeniedError(ServiceError):
-    pass
+   pass
 
 
 class BusinessRuleError(ServiceError):
+    pass
+
+class AuthenticationError(ServiceError):
+    pass
+
+
+class ServiceUnavailableError(ServiceError):
     pass

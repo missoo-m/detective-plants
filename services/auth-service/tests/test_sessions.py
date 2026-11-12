@@ -42,7 +42,7 @@ def test_touch_extends_session():
         s = store.create("u-1", "CLIENT", 60)
         clock.now += 50
         assert store.touch(s.session_id, 60) is True
-        clock.now += 50                                   # без продления сессия истекла бы
+        clock.now += 50                                  
         assert store.get(s.session_id) is not None, kind
         clock.now += 20
         assert store.touch(s.session_id, 60) is False, kind

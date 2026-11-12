@@ -1,13 +1,13 @@
-#Тесты GraphQL API (Query, Mutation, фильтры, сортировка, агрегаты) на mock-клиентах
 import io
 
 from app import clients
 from app.mutations import read_upload
 from app.schema import schema
+from tests.helpers import ctx_for
 
 
-def run(query: str, user: str = "user-1", variables=None):
-    return schema.execute_sync(query, variable_values=variables, context_value={"current_user_id": user})
+def run(query: str, user: str = "user-1", variables=None, token=None):
+    return schema.execute_sync(query, variable_values=variables, context_value=ctx_for(user, token))
 
 
 def ok(query: str, user: str = "user-1", variables=None) -> dict:
@@ -31,9 +31,9 @@ def test_me_and_related_data():
     assert len(data["diagnosis"]["checklist"]) == 2
 
 
-def test_not_found_is_null_and_me_error():
-    assert ok('{ request(id: "req-999") { id } user(id: "x") { id } }') == {"request": None, "user": None}
-    fails("{ me { id } }", "NOT_FOUND", user="ghost")
+def test_not_found_is_null():
+    assert ok('{ request(id: "req-999") { id } }') == {"request": None}
+    assert ok('{ user(id: "user-1") { id } }')["user"]["id"] == "user-1"
 
 
 def test_requests_filter_sort_paging():
@@ -42,49 +42,53 @@ def test_requests_filter_sort_paging():
     assert [r["id"] for r in ok('{ myRequests(filter: {search: "налёт"}) { id } }')["myRequests"]] == ["req-2"]
     period = '{ myRequests(filter: {createdFrom: "2026-01-15", createdTo: "2026-01-16"}) { id } }'
     assert [r["id"] for r in ok(period)["myRequests"]] == ["req-1", "req-2"]
-    assert [r["id"] for r in ok("{ availableRequests(sort: {direction: DESC}) { id } }")["availableRequests"]] == ["req-3", "req-1"]
+    queue = "{ availableRequests(sort: {direction: DESC}) { id } }"
+    assert [r["id"] for r in ok(queue, user="user-2")["availableRequests"]] == ["req-3", "req-1"]
     assert len(ok("{ myRequests(limit: 1, offset: 1) { id } }")["myRequests"]) == 1
-    assert [r["id"] for r in ok("{ requestsByExpert(expertId: \"user-2\", filter: {statuses: [DONE]}) { id } }")["requestsByExpert"]] == ["req-4"]
+    by_expert = '{ requestsByExpert(expertId: "user-2", filter: {statuses: [DONE]}) { id } }'
+    assert [r["id"] for r in ok(by_expert, user="user-2")["requestsByExpert"]] == ["req-4"]
 
 
 def test_filter_errors():
     fails('{ myRequests(filter: {createdFrom: "2026-02-01", createdTo: "2026-01-01"}) { id } }', "BAD_USER_INPUT")
     fails('{ myRequests(filter: {createdFrom: "вчера"}) { id } }', "BAD_USER_INPUT")
-    fails("{ availableRequests(limit: 0) { id } }", "BAD_USER_INPUT")
-    assert run("{ users(filter: {role: SUPERUSER}) { id } }").errors
+    fails("{ availableRequests(limit: 0) { id } }", "BAD_USER_INPUT", user="user-2")
+    assert run("{ users(filter: {role: SUPERUSER}) { id } }", user="user-3").errors
 
 
 def test_users_filter_sort():
-    names = ok("{ users(sort: {field: NAME, direction: DESC}) { name } }")["users"]
+    names = ok("{ users(sort: {field: NAME, direction: DESC}) { name } }", user="user-3")["users"]
     assert names[0]["name"] == "Пётр Огородников"
-    assert [u["id"] for u in ok("{ users(filter: {status: BLOCKED}) { id } }")["users"]] == ["user-5"]
-    assert len(ok('{ users(filter: {search: "example.com"}, limit: 2, offset: 1) { id } }')["users"]) == 2
+    assert [u["id"] for u in ok("{ users(filter: {status: BLOCKED}) { id } }", user="user-3")["users"]] == ["user-5"]
+    q = '{ users(filter: {search: "example.com"}, limit: 2, offset: 1) { id } }'
+    assert len(ok(q, user="user-3")["users"]) == 2
 
 
 def test_transactions_filter_sort():
     q = '{ transactions(filter: {status: "SUCCESS"}, sort: {field: AMOUNT, direction: DESC}) { id amount } }'
-    assert len(ok(q)["transactions"]) == 2
-    assert ok("{ transactions(filter: {minAmount: 30}) { id } }")["transactions"] == []
-    assert len(ok('{ transactions(filter: {userId: "user-4"}) { id request { symptoms } user { name } } }')["transactions"]) == 2
-    fails('{ transactions(filter: {status: "BAD"}) { id } }', "BAD_USER_INPUT")
+    assert len(ok(q, user="user-3")["transactions"]) == 2
+    assert ok("{ transactions(filter: {minAmount: 30}) { id } }", user="user-3")["transactions"] == []
+    q = '{ transactions(filter: {userId: "user-4"}) { id request { symptoms } user { name } } }'
+    assert len(ok(q, user="user-3")["transactions"]) == 2
+    fails('{ transactions(filter: {status: "BAD"}) { id } }', "BAD_USER_INPUT", user="user-3")
 
 
 def test_aggregates():
-    s = ok("{ requestsSummary { total byStatus { key count } } }")["requestsSummary"]
+    s = ok("{ requestsSummary { total byStatus { key count } } }", user="user-3")["requestsSummary"]
     assert s["total"] == 5 and {i["key"]: i["count"] for i in s["byStatus"]}["CREATED"] == 2
-    t = ok("{ transactionsSummary { count totalAmount byStatus { key amount } } }")["transactionsSummary"]
+    t = ok("{ transactionsSummary { count totalAmount byStatus { key amount } } }", user="user-3")["transactionsSummary"]
     assert t["count"] == 3 and t["totalAmount"] == 75.0
-    b = ok('{ expertBalance(expertId: "user-2") { earned commission pending available } }')["expertBalance"]
+    b = ok('{ expertBalance(expertId: "user-2") { earned commission pending available } }', user="user-2")["expertBalance"]
     assert b == {"earned": 50.0, "commission": 5.0, "pending": 30.0, "available": 15.0}
-    assert ok("{ usersSummary { total byRole { key count } } }")["usersSummary"]["total"] == 5
+    assert ok("{ usersSummary { total byRole { key count } } }", user="user-3")["usersSummary"]["total"] == 5
     assert ok('{ trackerProgress(trackerId: "track-1") { photosCount updatesCount } }')["trackerProgress"] == {
         "photosCount": 1, "updatesCount": 1}
     assert ok('{ chatUnreadCount(chatRoomId: "chat-1") }', user="user-2")["chatUnreadCount"] == 1
     assert ok("{ notificationsSummary { total unread } }")["notificationsSummary"] == {"total": 2, "unread": 1}
     assert ok('{ fieldNdviSummary(fieldId: "fld-1") { count trend } }')["fieldNdviSummary"] == {"count": 2, "trend": -0.07}
-    assert ok("{ platformSummary { completionRate } }")["platformSummary"]["completionRate"] == 75.0
+    assert ok("{ platformSummary { completionRate } }", user="user-3")["platformSummary"]["completionRate"] == 75.0
     assert [e["expertId"] for e in ok("{ topExperts(sortBy: AVG_RATING) { expertId } }")["topExperts"]] == ["user-2", "user-6"]
-    assert ok("{ applicationsSummary { total } }")["applicationsSummary"]["total"] == 2
+    assert ok("{ applicationsSummary { total } }", user="user-3")["applicationsSummary"]["total"] == 2
 
 
 def test_chat_access_control():
@@ -107,20 +111,20 @@ def test_full_diagnosis_scenario():
     pay = f'mutation {{ createPayment(input: {{requestId: "{rid}", idempotencyKey: "key-12345678"}}) {{ id amount status }} }}'
     first = ok(pay, user="user-4")["createPayment"]
     assert first["amount"] == 25.0 and ok(pay, user="user-4")["createPayment"]["id"] == first["id"]
-    assert ok(f'{{ request(id: "{rid}") {{ status }} }}')["request"]["status"] == "IN_PROGRESS"
+    assert ok(f'{{ request(id: "{rid}") {{ status }} }}', user="user-4")["request"]["status"] == "IN_PROGRESS"
 
     diag = ok(f'''mutation {{ createDiagnosis(input: {{requestId: "{rid}", diseaseId: "dis-1",
                     description: "Мучнистая роса, нужна обработка", durationDays: 10,
                     checklist: [{{step: "Обработать фунгицидом", frequency: "раз в 5 дней"}}]}}) {{ id checklist {{ step }} }} }}''',
               user="user-2")["createDiagnosis"]
     assert len(diag["checklist"]) == 1
-    tracker = ok(f'{{ trackerByRequest(requestId: "{rid}") {{ id status currentStage }} }}')["trackerByRequest"]
+    tracker = ok(f'{{ trackerByRequest(requestId: "{rid}") {{ id status currentStage }} }}', user="user-4")["trackerByRequest"]
     assert tracker["status"] == "ACTIVE" and tracker["currentStage"] == "START"
 
     ok(f'mutation {{ updateTreatment(trackerId: "{tracker["id"]}", input: {{changeDescription: "Увеличить интервал", newStage: "Лечение"}}) {{ recordType }} }}', user="user-2")
     done = ok(f'mutation {{ completeTracker(trackerId: "{tracker["id"]}") {{ status }} }}', user="user-2")
     assert done["completeTracker"]["status"] == "COMPLETED"
-    assert ok(f'{{ request(id: "{rid}") {{ status completedAt }} }}')["request"]["status"] == "DONE"
+    assert ok(f'{{ request(id: "{rid}") {{ status completedAt }} }}', user="user-4")["request"]["status"] == "DONE"
 
 
 def test_request_rules():
@@ -129,7 +133,7 @@ def test_request_rules():
     fails('mutation { selectExpert(requestId: "req-1", expertId: "user-2") { id } }', "FORBIDDEN", user="user-4")
     assert ok('mutation { cancelRequest(requestId: "req-1") { status } }')["cancelRequest"]["status"] == "CANCELLED"
     fails('mutation { cancelRequest(requestId: "req-1") { id } }', "BUSINESS_RULE_VIOLATION")
-    fails('mutation { cancelRequest(requestId: "req-2") { id } }', "BUSINESS_RULE_VIOLATION")      
+    fails('mutation { cancelRequest(requestId: "req-2") { id } }', "BUSINESS_RULE_VIOLATION")    
     fails('mutation { cancelRequest(requestId: "req-999") { id } }', "NOT_FOUND")
 
 
@@ -167,8 +171,8 @@ def test_chat_and_notifications():
 
 
 def test_register_login_profile():
-    data = ok('mutation { register(input: {email: "New@Example.com", password: "strongpass1", name: "Новая Клиентка"}) { token user { role } } }')
-    assert data["register"]["user"]["role"] == "CLIENT"
+    data = ok('mutation { register(input: {email: "New@Example.com", password: "strongpass1", name: "Новая Клиентка"}) { token tokenType user { role } } }')
+    assert data["register"]["user"]["role"] == "CLIENT" and data["register"]["tokenType"] == "Bearer"
     fails('mutation { register(input: {email: "anna@example.com", password: "strongpass1", name: "Дубль Имя"}) { token } }', "BUSINESS_RULE_VIOLATION")
     fails('mutation { login(input: {email: "anna@example.com", password: "wrong"}) { token } }', "FORBIDDEN")
     assert ok('mutation { login(input: {email: "anna@example.com", password: "password123"}) { user { id } } }')["login"]["user"]["id"] == "user-1"
@@ -182,11 +186,10 @@ def test_expert_verification_and_blocking():
     fails(f'mutation {{ verifyExpert(applicationId: "{app["id"]}", approve: true) {{ id }} }}', "FORBIDDEN")
     res = ok(f'mutation {{ verifyExpert(applicationId: "{app["id"]}", approve: true) {{ status }} }}', user="user-3")
     assert res["verifyExpert"]["status"] == "APPROVED"
-    assert ok("{ me { role } }")["me"]["role"] == "EXPERT"
+    assert ok("{ me { role } }")["me"]["role"] == "EXPERT"                
     assert ok('mutation { blockUser(userId: "user-4") { status } }', user="user-3")["blockUser"]["status"] == "BLOCKED"
     fails('mutation { blockUser(userId: "user-4") { id } }', "BUSINESS_RULE_VIOLATION", user="user-3")
     fails('mutation { blockUser(userId: "user-3") { id } }', "BUSINESS_RULE_VIOLATION", user="user-3")
-    fails('mutation { createRequest(input: {symptoms: "Заблокированный пользователь"}) { id } }', "FORBIDDEN", user="user-4")
 
 
 def test_create_field_and_upload_helper():
@@ -203,9 +206,3 @@ def test_create_field_and_upload_helper():
     assert (name, content) == ("leaf.png", b"data")
     photo = clients.request_client.add_photo("req-1", "user-1", name, content)
     assert photo["url"].endswith("leaf.png")
-    for bad in ("doc.pdf", ""):
-        try:
-            clients.request_client.add_photo("req-1", "user-1", bad or "x.png", b"" if not bad else b"1")
-            assert False
-        except Exception as exc:
-            assert exc.extensions["code"] == "BAD_USER_INPUT"

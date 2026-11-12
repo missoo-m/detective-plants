@@ -1,8 +1,8 @@
 import pytest
 
-from app import clients
+from tests.fakes import install_fakes
 
 
 @pytest.fixture(autouse=True)
 def fresh_clients():
-    clients.reset_clients()
+    install_fakes()

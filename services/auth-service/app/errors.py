@@ -15,3 +15,6 @@ class BusinessRuleError(ServiceError):
 
 class AuthenticationError(ServiceError):
     pass
+
+class ServiceUnavailableError(ServiceError):
+    pass

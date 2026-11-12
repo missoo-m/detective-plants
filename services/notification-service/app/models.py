@@ -18,5 +18,13 @@ class Notification(Base):
     user_id = Column(Uuid(as_uuid=True), nullable=False)
     type = Column(String(50), nullable=False)
     message = Column(Text, nullable=False)
-    status = Column(String(20), nullable=False, default="UNREAD")     # UNREAD / READ
+    status = Column(String(20), nullable=False, default="UNREAD")
     created_at = Column(DateTime, nullable=False, default=utcnow)
+
+
+class ProcessedEvent(Base):
+    __tablename__ = "processed_events"
+
+    event_id = Column(String(64), primary_key=True)
+    event_type = Column(String(50), nullable=False)
+    processed_at = Column(DateTime, nullable=False, default=utcnow)

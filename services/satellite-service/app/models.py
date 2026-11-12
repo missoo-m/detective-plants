@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text, Uuid
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -15,9 +15,9 @@ class Field(Base):
     __tablename__ = "fields"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    owner_id = Column(Uuid(as_uuid=True), nullable=False)       
+    owner_id = Column(Uuid(as_uuid=True), nullable=False)
     name = Column(String(100), nullable=False)
-    geometry = Column(Text, nullable=False)                    
+    geometry = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False, default=utcnow)
 
     measurements = relationship("NdviMeasurement", back_populates="field",
@@ -42,8 +42,22 @@ class SatelliteAlert(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     field_id = Column(Uuid(as_uuid=True), ForeignKey("fields.id"), nullable=False)
-    type = Column(String(50), nullable=False)                   # NDVI_DROP / WEATHER / DISEASE_RISK
+    type = Column(String(50), nullable=False)
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False, default=utcnow)
 
     field = relationship("Field", back_populates="alerts")
+
+
+class OutboxEvent(Base):
+    __tablename__ = "outbox_events"
+
+    seq = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(64), unique=True, nullable=False)
+    topic = Column(String(100), nullable=False)
+    event_key = Column(String(100))
+    event_type = Column(String(50), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+    published_at = Column(DateTime)
+    attempts = Column(Integer, nullable=False, default=0)

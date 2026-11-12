@@ -1,0 +1,57 @@
+syntax = "proto3";
+package admin;
+
+service AdminService {
+  rpc SubmitApplication (SubmitApplicationRequest) returns (ApplicationResponse);
+  rpc VerifyExpert (VerifyExpertRequest) returns (ApplicationResponse);
+  rpc BlockUser (BlockUserRequest) returns (BlockUserResponse);
+  rpc ListApplications (ListApplicationsRequest) returns (ListApplicationsResponse);
+  rpc GetApplicationsSummary (EmptyRequest) returns (ApplicationsSummaryResponse);
+}
+
+message EmptyRequest {}
+
+message SubmitApplicationRequest {
+  string user_id = 1;
+  string documents_url = 2;
+  optional string actor_role = 3;
+}
+
+message VerifyExpertRequest {
+  string application_id = 1;
+  bool approve = 2;
+  string admin_id = 3;
+  optional string actor_role = 4;
+}
+
+message ApplicationResponse {
+  string id = 1;
+  string user_id = 2;
+  optional string documents_url = 3;
+  string status = 4;
+  string submitted_at = 5;
+  optional string verified_at = 6;
+}
+
+message BlockUserRequest {
+  string user_id = 1;
+  string admin_id = 2;
+  optional string actor_role = 3;
+}
+message BlockUserResponse {
+  string user_id = 1;
+  string status = 2;
+}
+
+message ListApplicationsRequest {
+  optional string status = 1;
+  optional string submitted_from = 2;
+  optional string submitted_to = 3;
+  optional bool descending = 4;
+}
+message ListApplicationsResponse { repeated ApplicationResponse applications = 1; }
+
+message ApplicationsSummaryResponse {
+  int32 total = 1;
+  map<string, int32> by_status = 2;
+}

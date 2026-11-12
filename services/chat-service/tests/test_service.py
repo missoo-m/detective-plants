@@ -32,7 +32,7 @@ def test_reads_and_access(service):
     room = service.get_chat_room_by_request(R2, viewer_id=U1)
     assert room.status == "ACTIVE" and service.get_chat_room(room.id).id == CHAT
     with pytest.raises(PermissionDeniedError):
-        service.get_chat_room(CHAT, viewer_id=U4)                       # посторонний
+        service.get_chat_room(CHAT, viewer_id=U4)
     with pytest.raises(NotFoundError):
         service.get_chat_room_by_request(R1)
     assert len(service.list_video_rooms(CHAT)) == 1 and len(service.list_moderation_rules()) == 1
@@ -83,15 +83,15 @@ def test_moderation_block_and_warn(service, factory):
         s.commit()
     with pytest.raises(BusinessRuleError):
         service.send_message(CHAT, U1, "Заходите в казино")
-    assert len(service.list_messages(CHAT)) == 3                          # заблокированное не сохранено
-    warned = service.send_message(CHAT, U1, "Звоните +375 29 123 45 67")   # правило WARN: сообщение проходит
+    assert len(service.list_messages(CHAT)) == 3
+    warned = service.send_message(CHAT, U1, "Звоните +375 29 123 45 67")
     assert warned.text.startswith("Звоните")
 
 
 def test_mark_read(service):
     msg = service.list_messages(CHAT, unread_only=True)[0]
     with pytest.raises(BusinessRuleError):
-        service.mark_read(msg.id, U1)                                     # автор
+        service.mark_read(msg.id, U1)
     with pytest.raises(PermissionDeniedError):
         service.mark_read(msg.id, U4)
     assert service.mark_read(msg.id, U2).is_read is True and service.unread_count(CHAT, U2) == 0
@@ -99,8 +99,8 @@ def test_mark_read(service):
 
 def test_video_room(service):
     with pytest.raises(PermissionDeniedError):
-        service.create_video_room(CHAT, U1)                               # только эксперт
-    video = service.create_video_room(CHAT, U2)                           # предыдущая FINISHED
+        service.create_video_room(CHAT, U1)
+    video = service.create_video_room(CHAT, U2)
     assert video.status == "CREATED" and video.room_url.endswith(video.id)
     with pytest.raises(BusinessRuleError):
-        service.create_video_room(CHAT, U2)                               # прошлая ещё не завершена
+        service.create_video_room(CHAT, U2)

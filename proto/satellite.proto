@@ -1,0 +1,77 @@
+syntax = "proto3";
+package satellite;
+
+service SatelliteService {
+  rpc CreateField (CreateFieldRequest) returns (FieldResponse);
+  rpc GetField (GetFieldRequest) returns (FieldResponse);
+  rpc ListFields (ListFieldsRequest) returns (ListFieldsResponse);
+  rpc ListMeasurements (ListMeasurementsRequest) returns (ListMeasurementsResponse);
+  rpc RecordMeasurement (RecordMeasurementRequest) returns (MeasurementResponse);
+  rpc ListAlerts (ListAlertsRequest) returns (ListAlertsResponse);
+  rpc GetNdviSummary (GetFieldRequest) returns (NdviSummaryResponse);
+}
+
+message CreateFieldRequest {
+  string owner_id = 1;
+  string name = 2;
+  string geometry = 3;
+}
+
+message FieldResponse {
+  string id = 1;
+  string owner_id = 2;
+  string name = 3;
+  string geometry = 4;
+  string created_at = 5;
+}
+
+message GetFieldRequest { string field_id = 1; }
+
+message ListFieldsRequest { string owner_id = 1; }
+message ListFieldsResponse { repeated FieldResponse fields = 1; }
+
+message MeasurementResponse {
+  string id = 1;
+  string field_id = 2;
+  double ndvi_value = 3;
+  string measured_at = 4;
+}
+
+message ListMeasurementsRequest {
+  string field_id = 1;
+  optional bool descending = 2;
+  optional int32 limit = 3;
+}
+message ListMeasurementsResponse { repeated MeasurementResponse measurements = 1; }
+
+message RecordMeasurementRequest {
+  string field_id = 1;
+  double ndvi_value = 2;
+  optional string measured_at = 3;   
+}
+
+message AlertResponse {
+  string id = 1;
+  string field_id = 2;
+  string type = 3;
+  string message = 4;
+  string created_at = 5;
+}
+
+message ListAlertsRequest {
+  optional string field_id = 1;
+  optional string owner_id = 2;
+  optional string alert_type = 3;
+  optional bool descending = 4;
+}
+message ListAlertsResponse { repeated AlertResponse alerts = 1; }
+
+message NdviSummaryResponse {
+  string field_id = 1;
+  int32 count = 2;
+  double min_value = 3;
+  double max_value = 4;
+  double avg_value = 5;
+  double last_value = 6;
+  double trend = 7;
+}

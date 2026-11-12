@@ -22,7 +22,7 @@ def service():
 
 
 def test_filter_and_sort(service):
-    assert [n.type for n in service.list_notifications(U1)] == ["DIAGNOSIS_READY", "REQUEST_CREATED"]  
+    assert [n.type for n in service.list_notifications(U1)] == ["DIAGNOSIS_READY", "REQUEST_CREATED"]
     assert [n.type for n in service.list_notifications(U1, descending=False)][0] == "REQUEST_CREATED"
     assert [n.message for n in service.list_notifications(U1, status="UNREAD")] == ["Ваша заявка создана"]
     assert len(service.list_notifications(U1, notification_type="DIAGNOSIS_READY")) == 1
@@ -50,7 +50,7 @@ def test_create_notification(service):
 def test_mark_read(service):
     unread = service.list_notifications(U1, status="UNREAD")[0]
     assert service.mark_read(unread.id, U1).status == "READ"
-    assert service.mark_read(unread.id, U1).status == "READ"                
+    assert service.mark_read(unread.id, U1).status == "READ"
     assert service.count_unread(U1) == 0
     with pytest.raises(PermissionDeniedError):
         service.mark_read(unread.id, U2)

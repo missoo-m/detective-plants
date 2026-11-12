@@ -5,8 +5,9 @@ from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
 from . import config
-from .clients import AuthClient, ChatClient, MockAuthClient, MockChatClient, MockRequestClient, RequestClient
+from .clients import AuthClient, GrpcAuthClient, GrpcRequestClient, RequestClient
 from .database import get_session_factory
+from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import Transaction, Withdrawal, utcnow
 from .repository import SORT_COLUMNS, TransactionRepository, WithdrawalRepository
@@ -35,11 +36,10 @@ def _wd(w: Withdrawal) -> WithdrawalDTO:
 
 class PaymentService:
     def __init__(self, session_factory: Optional[Callable[[], Session]] = None, auth: Optional[AuthClient] = None,
-                 requests: Optional[RequestClient] = None, chat: Optional[ChatClient] = None):
+                 requests: Optional[RequestClient] = None):
         self._session_factory = session_factory or get_session_factory()
-        self._auth = auth or MockAuthClient()
-        self._requests = requests or MockRequestClient()
-        self._chat = chat or MockChatClient()
+        self._auth = auth or GrpcAuthClient()
+        self._requests = requests or GrpcRequestClient()
 
     def _require_role(self, user_id: str, role: str, actor_role: Optional[str] = None) -> None:
         if actor_role is not None:
@@ -141,7 +141,7 @@ class PaymentService:
         with self._session_factory() as session:
             repo = TransactionRepository(session)
             existing = repo.get_by_key(key)
-            if existing is not None:                          
+            if existing is not None:
                 if existing.request_id != rid or existing.user_id != cid:
                     raise BusinessRuleError("Ключ идемпотентности уже использован для другой операции")
                 return _tx(existing)
@@ -155,14 +155,15 @@ class PaymentService:
                 raise BusinessRuleError("Заявка уже оплачена")
             tx = Transaction(request_id=rid, user_id=cid, expert_id=parse_uuid(request["expert_id"]),
                              amount=config.SERVICE_PRICE, operation_type="PAYMENT", status="SUCCESS",
-                             idempotency_key=key)            
+                             idempotency_key=key)
             repo.add(tx)
-            session.commit()
+            session.flush()
             result = _tx(tx)
-            expert_id = request["expert_id"]
-        self._requests.start_work(request_id)               
-        self._chat.open_room(request_id, client_id, expert_id)
-        return result
+            add_event(session, "PaymentCompleted", {
+                "transaction_id": result.id, "request_id": request_id, "client_id": client_id,
+                "expert_id": request["expert_id"], "amount": result.amount, "currency": "BYN", "status": "SUCCESS"})
+            session.commit()
+            return result
 
     def request_withdrawal(self, expert_id: str, amount: float, actor_role: Optional[str] = None) -> WithdrawalDTO:
         eid = parse_uuid(expert_id)
@@ -176,8 +177,12 @@ class PaymentService:
                 raise BusinessRuleError(f"Недостаточно средств: доступно {available} BYN, запрошено {value} BYN")
             wd = Withdrawal(expert_id=eid, amount=value, status="PENDING")
             WithdrawalRepository(session).add(wd)
+            session.flush()
+            result = _wd(wd)
+            add_event(session, "WithdrawalRequested", {"withdrawal_id": result.id, "expert_id": expert_id,
+                                                       "amount": result.amount, "created_at": result.created_at})
             session.commit()
-            return _wd(wd)
+            return result
 
     def approve_withdrawal(self, withdrawal_id: str, admin_id: str, actor_role: Optional[str] = None) -> WithdrawalDTO:
         self._require_role(admin_id, "ADMIN", actor_role)
@@ -189,5 +194,10 @@ class PaymentService:
                 raise BusinessRuleError(f"Заявка уже обработана (статус {wd.status})")
             wd.status = "APPROVED"
             wd.processed_at = utcnow()
+            session.flush()
+            result = _wd(wd)
+            add_event(session, "WithdrawalApproved", {"withdrawal_id": result.id, "expert_id": result.expert_id,
+                                                      "amount": result.amount, "admin_id": admin_id,
+                                                      "processed_at": result.processed_at})
             session.commit()
-            return _wd(wd)
+            return result

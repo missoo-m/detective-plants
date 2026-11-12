@@ -5,6 +5,7 @@ from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
 from .database import get_session_factory
+from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import Profile, ReferralProfile, User, UserSettings
 from .repository import SORT_COLUMNS, UserRepository
@@ -98,6 +99,9 @@ class AuthService:
             user.referral_profile = ReferralProfile(
                 referral_link=f"https://detective-plants.example/ref/{uuid.uuid4().hex[:10]}")
             repo.add(user)
+            session.flush()
+            add_event(session, "UserRegistered", {"user_id": str(user.id), "email": email, "name": name,
+                                                  "role": role.name, "created_at": fmt_dt(user.created_at)})
             session.commit()
             return _to_dto(user)
 

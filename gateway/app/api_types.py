@@ -7,6 +7,7 @@ from . import clients
 from .errors import NotFoundError
 
 
+#  enum'ы
 @strawberry.enum
 class Role(Enum):
     CLIENT = "CLIENT"
@@ -69,6 +70,7 @@ class ApplicationStatus(Enum):
     REJECTED = "REJECTED"
 
 
+#  типы
 @strawberry.type
 class Profile:
     id: strawberry.ID
@@ -468,6 +470,7 @@ class PlatformSummary:
     avg_rating: float
 
 
+#  мапперы
 def to_profile(d: Optional[dict]) -> Optional[Profile]:
     if not d:
         return None

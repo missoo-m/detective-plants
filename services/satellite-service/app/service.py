@@ -5,6 +5,7 @@ from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
 from .database import get_session_factory
+from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError
 from .models import Field, NdviMeasurement, SatelliteAlert, utcnow
 from .repository import FieldRepository
@@ -12,7 +13,7 @@ from .schemas import AlertDTO, FieldDTO, MeasurementDTO, NdviSummaryDTO
 from .utils import fmt_dt, parse_uuid
 
 MAX_FIELDS_PER_OWNER = 10
-NDVI_DROP_THRESHOLD = 0.10          
+NDVI_DROP_THRESHOLD = 0.10
 ALERT_TYPES = {"NDVI_DROP", "WEATHER", "DISEASE_RISK"}
 
 
@@ -119,7 +120,8 @@ class SatelliteService:
         when = measured_at or utcnow()
         with self._session_factory() as session:
             repo = FieldRepository(session)
-            if repo.get_by_id(fid) is None:
+            field = repo.get_by_id(fid)
+            if field is None:
                 raise NotFoundError(f"Поле {field_id} не найдено")
             previous = repo.list_measurements(fid, descending=True, limit=1)
             if previous and when <= previous[0].measured_at:
@@ -129,7 +131,12 @@ class SatelliteService:
             if previous and previous[0].ndvi_value > 0:
                 drop = (previous[0].ndvi_value - ndvi_value) / previous[0].ndvi_value
                 if drop >= NDVI_DROP_THRESHOLD:
-                    repo.add(SatelliteAlert(field_id=fid, type="NDVI_DROP", created_at=when,
-                                            message=f"Снижение NDVI на {round(drop * 100)}% с прошлого измерения"))
+                    alert = SatelliteAlert(field_id=fid, type="NDVI_DROP", created_at=when,
+                                           message=f"Снижение NDVI на {round(drop * 100)}% с прошлого измерения")
+                    repo.add(alert)
+                    session.flush()
+                    add_event(session, "SatelliteAlertCreated", {
+                        "alert_id": str(alert.id), "field_id": field_id, "owner_id": str(field.owner_id),
+                        "alert_type": alert.type, "message": alert.message, "created_at": fmt_dt(alert.created_at)})
             session.commit()
             return _measurement(measurement)

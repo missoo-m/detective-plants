@@ -2,8 +2,9 @@ from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
-from .clients import AuthClient, MockAuthClient, MockRecoveryClient, MockRequestClient, RecoveryClient, RequestClient
+from .clients import AuthClient, GrpcAuthClient, GrpcRequestClient, RequestClient
 from .database import get_session_factory
+from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import Diagnosis, ExpertResponse, MLTrainingExample, TreatmentChecklist
 from .repository import DiagnosisRepository, ResponseRepository
@@ -40,11 +41,10 @@ def _clean_step(step: dict) -> dict:
 
 class ExpertService:
     def __init__(self, session_factory: Optional[Callable[[], Session]] = None, auth: Optional[AuthClient] = None,
-                 requests: Optional[RequestClient] = None, recovery: Optional[RecoveryClient] = None):
+                 requests: Optional[RequestClient] = None):
         self._session_factory = session_factory or get_session_factory()
-        self._auth = auth or MockAuthClient()
-        self._requests = requests or MockRequestClient()
-        self._recovery = recovery or MockRecoveryClient()
+        self._auth = auth or GrpcAuthClient()
+        self._requests = requests or GrpcRequestClient()
 
     def _require_expert(self, expert_id: str, actor_role: Optional[str] = None) -> None:
         if actor_role is not None:
@@ -113,6 +113,10 @@ class ExpertService:
                 raise BusinessRuleError("Вы уже откликнулись на эту заявку")
             response = ExpertResponse(request_id=rid, expert_id=eid, comment=comment, status="PENDING")
             repo.add(response)
+            session.flush()
+            add_event(session, "ExpertResponseCreated", {
+                "response_id": str(response.id), "request_id": request_id, "client_id": request["client_id"],
+                "expert_id": expert_id, "comment": comment, "created_at": fmt_dt(response.created_at)})
             session.commit()
             return _to_response_dto(response)
 
@@ -145,7 +149,7 @@ class ExpertService:
             raise PermissionDeniedError("Диагноз может поставить только эксперт, выбранный клиентом")
         if request["status"] != "IN_PROGRESS":
             raise BusinessRuleError("Диагноз можно поставить только по оплаченной заявке в работе")
-        self._requests.get_disease(disease_id)                      
+        self._requests.get_disease(disease_id)
         with self._session_factory() as session:
             repo = DiagnosisRepository(session)
             if repo.get_by_request(rid) is not None:
@@ -157,10 +161,14 @@ class ExpertService:
             ai = request.get("ai_prediagnosis")
             if ai and ai.strip().lower() != description.lower():
                 repo.add_ml_example(MLTrainingExample(request_id=rid, ai_prediagnosis=ai, expert_correction=description))
-            session.commit()
+            session.flush()
             result = _to_diagnosis_dto(diagnosis)
-        self._recovery.create_tracker(request_id, request["client_id"], expert_id, duration_days)
-        return result
+            add_event(session, "DiagnosisCreated", {
+                "diagnosis_id": result.id, "request_id": request_id, "client_id": request["client_id"],
+                "expert_id": expert_id, "disease_id": disease_id, "description": description,
+                "duration_days": duration_days, "created_at": result.created_at})
+            session.commit()
+            return result
 
     def add_treatment_step(self, diagnosis_id: str, expert_id: str, step: str, frequency: Optional[str] = None,
                            duration_days: Optional[int] = None) -> TreatmentStepDTO:

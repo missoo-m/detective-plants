@@ -15,3 +15,10 @@ class PermissionDeniedError(ServiceError):
 
 class BusinessRuleError(ServiceError):
     pass
+
+class AuthenticationError(ServiceError):
+    pass
+
+
+class ServiceUnavailableError(ServiceError):
+    pass

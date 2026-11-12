@@ -66,6 +66,7 @@ def _scope_transactions(info: Info, params: dict) -> dict:
 
 @strawberry.type
 class Query:
+    #  пользователи (Auth Service)
     @_field("Query.me")
     def me(self, info: Info) -> User:
         return to_user(clients.auth_client.get_user(identity_of(info).user_id))
@@ -93,6 +94,7 @@ class Query:
     def users_summary(self) -> UsersSummary:
         return to_users_summary(clients.auth_client.users_summary())
 
+    # заявки (Request Service)
     @_field("Query.request")
     def request(self, info: Info, id: strawberry.ID) -> Optional[Request]:
         try:
@@ -122,7 +124,7 @@ class Query:
     def requests_by_expert(self, info: Info, expert_id: strawberry.ID, filter: Optional[RequestFilterInput] = None,
                            sort: Optional[RequestSortInput] = None, limit: Optional[int] = None,
                            offset: int = 0) -> list[Request]:
-        expert_id = expert_scope(identity_of(info), expert_id)             # эксперт — только свои заявки
+        expert_id = expert_scope(identity_of(info), expert_id)             
         data = clients.request_client.list_requests(expert_id=expert_id, limit=limit, offset=offset,
                                                     **_request_params(filter, sort))
         return [to_request(r) for r in data]
@@ -133,6 +135,7 @@ class Query:
         scope = scoped_filters(identity_of(info), client_id, expert_id)
         return to_requests_summary(clients.request_client.requests_summary(scope["client_id"], scope["expert_id"]))
 
+    # диагнозы и отклики (Expert Service)
     @_field("Query.diagnosis")
     def diagnosis(self, info: Info, id: strawberry.ID) -> Optional[Diagnosis]:
         try:
@@ -159,6 +162,7 @@ class Query:
         expert_id = expert_scope(identity_of(info), expert_id)
         return to_responses_summary(clients.expert_client.responses_summary(expert_id))
 
+    # трекеры (Recovery Service)
     @_field("Query.tracker")
     def tracker(self, info: Info, id: strawberry.ID) -> Optional[RecoveryTracker]:
         try:
@@ -181,6 +185,7 @@ class Query:
         assert_case_access(identity_of(info), clients.recovery_client.get_tracker(tracker_id))
         return to_progress(clients.recovery_client.tracker_progress(tracker_id))
 
+    # чаты (Chat Service): только участники
     @_field("Query.chatRoom")
     def chat_room(self, info: Info, id: strawberry.ID) -> Optional[ChatRoom]:
         try:
@@ -197,6 +202,7 @@ class Query:
     def chat_unread_count(self, info: Info, chat_room_id: strawberry.ID) -> int:
         return clients.chat_client.unread_count(chat_room_id, identity_of(info).user_id)
 
+    # уведомления (всегда свои)
     @_field("Query.notifications")
     def notifications(self, info: Info, filter: Optional[NotificationFilterInput] = None, newest_first: bool = True,
                       limit: Optional[int] = None, offset: int = 0) -> list[Notification]:
@@ -209,6 +215,7 @@ class Query:
     def notifications_summary(self, info: Info) -> NotificationsSummary:
         return to_notifications_summary(clients.notification_client.notifications_summary(identity_of(info).user_id))
 
+    # финансы (Payment Service)
     @_field("Query.transactions")
     def transactions(self, info: Info, filter: Optional[TransactionFilterInput] = None,
                      sort: Optional[TransactionSortInput] = None, limit: Optional[int] = None,
@@ -237,6 +244,7 @@ class Query:
         """Баланс эксперта: эксперт видит только свой, администратор — любой."""
         return to_balance(clients.payment_client.expert_balance(expert_scope(identity_of(info), expert_id)))
 
+    # администрирование (только администратор)
     @_field("Query.expertApplications")
     def expert_applications(self, filter: Optional[ApplicationFilterInput] = None,
                             newest_first: bool = True) -> list[ExpertApplication]:
@@ -250,6 +258,7 @@ class Query:
     def applications_summary(self) -> ApplicationsSummary:
         return to_applications_summary(clients.admin_client.applications_summary())
 
+    # аналитика (Analytics Service)
     @_field("Query.expertStats")
     def expert_stats(self, info: Info, expert_id: strawberry.ID) -> Optional[ExpertStats]:
         expert_id = expert_scope(identity_of(info), expert_id)
@@ -273,6 +282,7 @@ class Query:
     def platform_summary(self) -> PlatformSummary:
         return to_platform_summary(clients.analytics_client.platform_summary())
 
+    # спутниковый мониторинг (поля — только владельца)
     @_field("Query.myFields")
     def my_fields(self, info: Info) -> list[SatelliteField]:
         return [to_field(f) for f in clients.satellite_client.list_fields(identity_of(info).user_id)]
