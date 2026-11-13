@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
+import logging
 from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from .repository import SORT_COLUMNS, TransactionRepository, WithdrawalRepositor
 from .schemas import BalanceDTO, TransactionDTO, TransactionsSummaryDTO, WithdrawalDTO
 from .utils import fmt_dt, parse_uuid
 
+log = logging.getLogger("payment")
 TRANSACTION_STATUSES = {"PENDING", "SUCCESS", "FAILED"}
 OPERATION_TYPES = {"PAYMENT", "PAYOUT", "REFUND"}
 WITHDRAWAL_STATUSES = {"PENDING", "APPROVED", "REJECTED"}
@@ -200,4 +202,31 @@ class PaymentService:
                                                       "amount": result.amount, "admin_id": admin_id,
                                                       "processed_at": result.processed_at})
             session.commit()
+            return result
+
+    def refund_payment(self, transaction_id: str, reason: str = "") -> Optional[TransactionDTO]:
+        tid = parse_uuid(transaction_id)
+        with self._session_factory() as session:
+            repo = TransactionRepository(session)
+            original = repo.get_by_id(tid)
+            if original is None:
+                raise NotFoundError(f"Транзакция {transaction_id} не найдена")
+            if original.operation_type != "PAYMENT":
+                raise BusinessRuleError("Вернуть можно только платёж за консультацию")
+            key = f"refund-{tid}"
+            if repo.get_by_key(key) is not None or original.status != "SUCCESS":
+                return None
+            original.status = "FAILED"
+            refund = Transaction(request_id=original.request_id, user_id=original.user_id,
+                                 expert_id=original.expert_id, amount=original.amount, operation_type="REFUND",
+                                 status="SUCCESS", idempotency_key=key)
+            repo.add(refund)
+            session.flush()
+            result = _tx(refund)
+            add_event(session, "PaymentRefunded", {
+                "transaction_id": result.id, "original_transaction_id": transaction_id,
+                "request_id": result.request_id, "client_id": result.user_id, "amount": result.amount,
+                "currency": "BYN", "reason": reason})
+            session.commit()
+            log.info("Платёж %s возвращён клиенту: %s", transaction_id, reason)
             return result
