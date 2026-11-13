@@ -10,3 +10,9 @@ class ApplicationDTO:
     status: str
     submitted_at: str
     verified_at: Optional[str]
+
+
+@dataclass
+class ApplicationsSummaryDTO:
+    total: int
+    by_status: dict

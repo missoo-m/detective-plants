@@ -1,9 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, Uuid,
-)
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -76,3 +74,37 @@ class UserSettings(Base):
     notifications_enabled = Column(Boolean, default=True)
 
     user = relationship("User", back_populates="settings")
+
+
+class OutboxEvent(Base):
+    __tablename__ = "outbox_events"
+
+    seq = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(64), unique=True, nullable=False)
+    topic = Column(String(100), nullable=False)
+    event_key = Column(String(100))
+    event_type = Column(String(50), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+    published_at = Column(DateTime)
+    attempts = Column(Integer, nullable=False, default=0)
+
+
+class ProcessedEvent(Base):
+    __tablename__ = "processed_events"
+
+    event_id = Column(String(64), primary_key=True)
+    event_type = Column(String(50), nullable=False)
+    processed_at = Column(DateTime, nullable=False, default=utcnow)
+
+
+class DeadLetter(Base):
+    __tablename__ = "dead_letters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(64))
+    event_type = Column(String(50))
+    reason = Column(Text, nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+    replayed_at = Column(DateTime)

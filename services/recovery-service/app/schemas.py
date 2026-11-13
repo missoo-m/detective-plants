@@ -23,3 +23,13 @@ class TrackerDTO:
     status: str
     current_stage: Optional[str]
     history: list[HistoryDTO] = field(default_factory=list)
+
+
+@dataclass
+class ProgressDTO:
+    tracker_id: str
+    total_days: int
+    elapsed_days: int
+    percent: float
+    photos_count: int
+    updates_count: int

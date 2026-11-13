@@ -1,18 +1,63 @@
-from .database import init_db
-from .seed import seed, sid
+import argparse
+import logging
+import signal
+import threading
+
+from . import config
+from .database import get_session_factory, init_db
+from .grpc_server import registration
+from .grpc_support import build_server
+from .logging_setup import configure_logging
+from .seed import seed
 from .service import PaymentService
+from .events import EventConsumer, KafkaProducer, OutboxRelay, ensure_topics
+from .handlers import build_handlers
+
+log = logging.getLogger(config.SERVICE_NAME)
 
 
-def main() -> None:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Payment Service")
+    parser.add_argument("--replay-dead-letters", action="store_true",
+                        help="повторно обработать необработанные события из таблицы dead_letters и завершиться")
+    parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
+    args = parser.parse_args(argv)
+    configure_logging(config.SERVICE_NAME)
+
     init_db()
-    print("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if config.SEED_ON_START or args.init_only:
+        log.info("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if args.init_only:
+        return 0
 
-    service = PaymentService()
-    print("\nТранзакции по заявке req-2:")
-    for t in service.list_transactions(request_id=str(sid("req-2"))):
-        print(f"  {t.operation_type} {t.amount:.2f} [{t.status}]")
-    print("Заявки на вывод:", [(w.amount, w.status) for w in service.list_withdrawals()])
+    factory = get_session_factory()
+    service = PaymentService(factory)
+    if args.replay_dead_letters:
+        EventConsumer(factory, build_handlers(service)).replay_dead_letters()
+        return 0
+
+    registrars, names = registration(service)
+    workers = []
+    ensure_topics()
+    producer = KafkaProducer()
+    workers.append(OutboxRelay(factory, producer))
+    workers.append(EventConsumer(factory, build_handlers(service), dead_letter_producer=producer))
+    for worker in workers:
+        worker.start()
+    server, port = build_server(registrars, config.GRPC_PORT, names, config.INTERNAL_API_KEY)
+    server.start()
+    log.info("%s: gRPC слушает порт %s", config.SERVICE_NAME, port)
+
+    stop = threading.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop.set())
+    stop.wait()
+    log.info("Остановка...")
+    server.stop(5).wait()
+    for worker in workers:
+        worker.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

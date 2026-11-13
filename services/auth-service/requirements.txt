@@ -1,2 +1,9 @@
 sqlalchemy==2.0.29
 psycopg2-binary==2.9.9
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+redis==5.0.3
+grpcio>=1.62
+grpcio-health-checking>=1.62
+protobuf>=4.25
+confluent-kafka>=2.3

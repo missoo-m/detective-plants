@@ -19,8 +19,12 @@ def seed(session_factory: Optional[Callable[[], Session]] = None) -> bool:
     with factory() as session:
         if session.scalars(select(ExpertStats)).first():
             return False
-        session.add(ExpertStats(id=sid("estats-1"), expert_id=sid("user-2"), total_requests=2,
-                                completed_requests=1, avg_rating=4.8, updated_at=datetime(2026, 1, 20, 0, 0)))
+        session.add_all([
+            ExpertStats(id=sid("estats-1"), expert_id=sid("user-2"), total_requests=2, completed_requests=1,
+                        avg_rating=4.8, updated_at=datetime(2026, 1, 20, 0, 0)),
+            ExpertStats(id=sid("estats-2"), expert_id=sid("user-6"), total_requests=10, completed_requests=8,
+                        avg_rating=4.2, updated_at=datetime(2026, 1, 20, 0, 0)),
+        ])
         session.add_all([
             DiseaseStats(id=sid("dstats-1"), disease_id=sid("dis-1"), count=3, period="2026-01"),
             DiseaseStats(id=sid("dstats-2"), disease_id=sid("dis-2"), count=1, period="2026-01"),

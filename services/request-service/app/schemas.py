@@ -36,3 +36,9 @@ class DiseaseDTO:
     description: Optional[str]
     symptoms: Optional[str]
     treatment: Optional[str]
+
+
+@dataclass
+class RequestsSummaryDTO:
+    total: int
+    by_status: dict

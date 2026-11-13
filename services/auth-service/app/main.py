@@ -1,21 +1,73 @@
-from .database import init_db
-from .seed import seed, sid
-from .service import AuthService
+import argparse
+import logging
+import signal
+import threading
+
+from . import config
+from .database import get_session_factory, init_db
+from .grpc_server import registration
+from .grpc_support import build_server
+from .logging_setup import configure_logging
+from .seed import seed
+from .api import build_manager
+from .events import EventConsumer, KafkaProducer, OutboxRelay, ensure_topics
+from .handlers import build_handlers
+
+log = logging.getLogger(config.SERVICE_NAME)
 
 
-def main() -> None:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Auth Service")
+    parser.add_argument("--replay-dead-letters", action="store_true",
+                        help="повторно обработать необработанные события из таблицы dead_letters и завершиться")
+    parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
+    args = parser.parse_args(argv)
+    configure_logging(config.SERVICE_NAME)
+
     init_db()
-    print("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if config.SEED_ON_START or args.init_only:
+        log.info("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if args.init_only:
+        return 0
 
-    service = AuthService()
-    print("\nЭксперты:")
-    for u in service.list_users(role="EXPERT"):
-        print(f"  {u.name} <{u.email}> рейтинг={u.profile.rating if u.profile else '-'}")
+    factory = get_session_factory()
+    manager = build_manager()
+    service = manager.directory
+    service.session_manager = manager
+    if args.replay_dead_letters:
+        EventConsumer(factory, build_handlers(service)).replay_dead_letters()
+        return 0
 
-    user = service.get_user(str(sid("user-1")))
-    print(f"\nПользователь user-1: {user.name}, роль {user.role}, статус {user.status}")
-    print("validate_user(user-5):", service.validate_user(str(sid("user-5"))))
+    registrars, names = registration(service)
+    workers = []
+    ensure_topics()
+    producer = KafkaProducer()
+    workers.append(OutboxRelay(factory, producer))
+    workers.append(EventConsumer(factory, build_handlers(service), dead_letter_producer=producer))
+
+    for worker in workers:
+        print(f"WORKER: {worker!r} type={type(worker).__module__}.{type(worker).__name__} "
+              f"mro={[c.__name__ for c in type(worker).__mro__]} "
+              f"_bootstrap={getattr(worker, '_bootstrap', 'MISSING')!r}", flush=True)
+    for worker in workers:
+        worker.start()
+
+        
+    server, port = build_server(registrars, config.GRPC_PORT, names, config.INTERNAL_API_KEY)
+
+    server.start()
+    log.info("%s: gRPC слушает порт %s", config.SERVICE_NAME, port)
+
+    stop = threading.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop.set())
+    stop.wait()
+    log.info("Остановка...")
+    server.stop(5).wait()
+    for worker in workers:
+        worker.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -1,0 +1,89 @@
+syntax = "proto3";
+package chat;
+
+service ChatService {
+  rpc SendMessage (SendMessageRequest) returns (MessageResponse);
+  rpc CreateVideoRoom (CreateVideoRoomRequest) returns (VideoRoomResponse);
+  rpc GetChatRoom (GetChatRoomRequest) returns (ChatRoomResponse);
+  rpc GetChatRoomByRequest (GetChatRoomByRequestRequest) returns (ChatRoomLookupResponse);
+  rpc ListMessages (ListMessagesRequest) returns (ListMessagesResponse);
+  rpc GetUnreadCount (UnreadCountRequest) returns (UnreadCountResponse);
+  rpc MarkRead (MarkReadRequest) returns (MessageResponse);
+}
+
+message SendMessageRequest {
+  string chat_room_id = 1;
+  string sender_id = 2;
+  optional string text = 3;
+  optional string attachment_url = 4;
+}
+
+message MessageResponse {
+  string id = 1;
+  string chat_room_id = 2;
+  string sender_id = 3;
+  optional string text = 4;
+  optional string attachment_url = 5;
+  bool is_read = 6;
+  string sent_at = 7;
+}
+
+message CreateVideoRoomRequest {
+  string chat_room_id = 1;
+  string expert_id = 2;
+}
+
+message VideoRoomResponse {
+  string id = 1;
+  string chat_room_id = 2;
+  string room_url = 3;
+  string status = 4;
+  optional string recording_url = 5;
+  string created_at = 6;
+  optional string finished_at = 7;
+}
+
+message ChatRoomResponse {
+  string id = 1;
+  string request_id = 2;
+  string client_id = 3;
+  string expert_id = 4;
+  string status = 5;
+  string created_at = 6;
+}
+
+message GetChatRoomRequest {
+  string chat_room_id = 1;
+  optional string viewer_id = 2;
+}
+
+message GetChatRoomByRequestRequest {
+  string request_id = 1;
+  optional string viewer_id = 2;
+}
+
+message ChatRoomLookupResponse {
+  bool found = 1;
+  optional ChatRoomResponse room = 2;
+}
+
+message ListMessagesRequest {
+  string chat_room_id = 1;
+  optional bool unread_only = 2;
+  optional string sender_id = 3;
+  optional string search = 4;
+  optional bool descending = 5;
+  optional int32 limit = 6;
+}
+message ListMessagesResponse { repeated MessageResponse messages = 1; }
+
+message UnreadCountRequest {
+  string chat_room_id = 1;
+  string user_id = 2;
+}
+message UnreadCountResponse { int32 count = 1; }
+
+message MarkReadRequest {
+  string message_id = 1;
+  string reader_id = 2;
+}

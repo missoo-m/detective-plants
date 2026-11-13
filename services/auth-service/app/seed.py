@@ -1,4 +1,3 @@
-import hashlib
 import uuid
 from datetime import datetime
 from typing import Callable, Optional
@@ -8,14 +7,11 @@ from sqlalchemy.orm import Session
 
 from .database import get_session_factory
 from .models import Profile, ReferralProfile, Role, User, UserSettings
+from .security import hash_password
 
 
 def sid(name: str) -> uuid.UUID:
     return uuid.uuid5(uuid.NAMESPACE_URL, f"plant-detective/{name}")
-
-
-def _hash(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
 
 
 USERS = [
@@ -50,7 +46,7 @@ def seed(session_factory: Optional[Callable[[], Session]] = None) -> bool:
         for key, email, name, role, status, created, rating, desc in USERS:
             user = User(
                 id=sid(key), email=email, name=name, role_id=roles[role].id,
-                password_hash=_hash("password123"), status=status, created_at=created,
+                password_hash=hash_password("password123"), status=status, created_at=created,
             )
             session.add(user)
             session.flush()

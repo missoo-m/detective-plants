@@ -1,0 +1,115 @@
+syntax = "proto3";
+package auth;
+
+service AuthService {
+  rpc ValidateUser (ValidateUserRequest) returns (ValidateUserResponse);
+  rpc GetUser (GetUserRequest) returns (UserResponse);
+  rpc GetUsers (GetUsersRequest) returns (GetUsersResponse);
+  rpc Register (RegisterRequest) returns (UserResponse);
+  rpc Login (LoginRequest) returns (AuthResponse);
+  rpc UpdateProfile (UpdateProfileRequest) returns (UserResponse);
+  rpc VerifyToken (VerifyTokenRequest) returns (IdentityResponse);
+  rpc Logout (LogoutRequest) returns (LogoutResponse);
+  rpc AssignRole (AssignRoleRequest) returns (UserResponse);
+  rpc SetUserStatus (SetUserStatusRequest) returns (SetUserStatusResponse);
+  rpc GetUsersSummary (EmptyRequest) returns (UsersSummaryResponse);
+}
+
+message EmptyRequest {}
+
+message ValidateUserRequest { string user_id = 1; }
+message ValidateUserResponse {
+  bool valid = 1;
+  optional string role = 2;
+  optional string status = 3;
+}
+
+message GetUserRequest { string user_id = 1; }
+
+message ProfileResponse {
+  string id = 1;
+  optional string photo_url = 2;
+  optional string description = 3;
+  double rating = 4;
+  string language = 5;
+}
+
+message UserResponse {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  optional string role = 4;
+  string status = 5;
+  string created_at = 6;
+  optional ProfileResponse profile = 7;
+}
+
+message GetUsersRequest {
+  optional string role = 1;
+  optional string status = 2;
+  optional string search = 3;
+  optional string sort_by = 4;
+  optional bool descending = 5;
+  optional int32 limit = 6;
+  optional int32 offset = 7;
+}
+message GetUsersResponse { repeated UserResponse users = 1; }
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string token = 1;
+  optional string refresh_token = 2;
+  UserResponse user = 3;
+  int32 expires_in = 4;
+  string session_id = 5;
+  string token_type = 6;
+}
+
+message UpdateProfileRequest {
+  string user_id = 1;
+  optional string name = 2;
+  optional string photo_url = 3;
+  optional string description = 4;
+  optional string language = 5;
+}
+
+message VerifyTokenRequest { string token = 1; }
+message IdentityResponse {
+  string user_id = 1;
+  string role = 2;
+  string status = 3;
+  string session_id = 4;
+}
+
+message LogoutRequest { string token = 1; }
+message LogoutResponse { bool revoked = 1; }
+
+message AssignRoleRequest {
+  string user_id = 1;
+  string role = 2;
+}
+
+message SetUserStatusRequest {
+  string user_id = 1;
+  string status = 2;
+}
+message SetUserStatusResponse {
+  UserResponse user = 1;
+  int32 revoked_sessions = 2;
+}
+
+message UsersSummaryResponse {
+  int32 total = 1;
+  map<string, int32> by_role = 2;
+  map<string, int32> by_status = 3;
+}

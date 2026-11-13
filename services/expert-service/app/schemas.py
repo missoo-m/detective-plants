@@ -31,3 +31,9 @@ class DiagnosisDTO:
     duration_days: int
     created_at: str
     checklist: list[TreatmentStepDTO] = field(default_factory=list)
+
+
+@dataclass
+class ResponsesSummaryDTO:
+    total: int
+    by_status: dict

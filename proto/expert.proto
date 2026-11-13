@@ -1,0 +1,83 @@
+syntax = "proto3";
+package expert;
+
+service ExpertService {
+  rpc RespondToRequest (RespondToRequestRequest) returns (ExpertResponseMsg);
+  rpc CreateDiagnosis (CreateDiagnosisRequest) returns (DiagnosisResponse);
+  rpc GetDiagnosis (GetDiagnosisRequest) returns (DiagnosisResponse);
+  rpc GetDiagnosisById (GetDiagnosisByIdRequest) returns (DiagnosisResponse);
+  rpc AddTreatmentStep (AddTreatmentStepRequest) returns (TreatmentStepResponse);
+  rpc ListResponses (ListResponsesRequest) returns (ListResponsesResponse);
+  rpc GetResponsesSummary (ResponsesSummaryRequest) returns (ResponsesSummaryResponse);
+}
+
+message RespondToRequestRequest {
+  string request_id = 1;
+  string expert_id = 2;
+  optional string comment = 3;
+  optional string actor_role = 4;
+}
+
+message ExpertResponseMsg {
+  string id = 1;
+  string request_id = 2;
+  string expert_id = 3;
+  optional string comment = 4;
+  string status = 5;
+  string created_at = 6;
+}
+
+message TreatmentStepInput {
+  string step = 1;
+  optional string frequency = 2;
+  optional int32 duration_days = 3;
+}
+
+message CreateDiagnosisRequest {
+  string request_id = 1;
+  string expert_id = 2;
+  string disease_id = 3;
+  string description = 4;
+  optional int32 duration_days = 5;
+  repeated TreatmentStepInput checklist = 6;
+  optional string actor_role = 7;
+}
+
+message TreatmentStepResponse {
+  string id = 1;
+  string step = 2;
+  optional string frequency = 3;
+  optional int32 duration_days = 4;
+}
+
+message DiagnosisResponse {
+  string id = 1;
+  string request_id = 2;
+  string expert_id = 3;
+  string disease_id = 4;
+  optional string description = 5;
+  optional string ai_prediagnosis = 6;
+  int32 duration_days = 7;
+  string created_at = 8;
+  repeated TreatmentStepResponse checklist = 9;
+}
+
+message GetDiagnosisRequest { string request_id = 1; }
+message GetDiagnosisByIdRequest { string diagnosis_id = 1; }
+
+message AddTreatmentStepRequest {
+  string diagnosis_id = 1;
+  string expert_id = 2;
+  string step = 3;
+  optional string frequency = 4;
+  optional int32 duration_days = 5;
+}
+
+message ListResponsesRequest { string request_id = 1; }
+message ListResponsesResponse { repeated ExpertResponseMsg responses = 1; }
+
+message ResponsesSummaryRequest { string expert_id = 1; }
+message ResponsesSummaryResponse {
+  int32 total = 1;
+  map<string, int32> by_status = 2;
+}

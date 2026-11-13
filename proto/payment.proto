@@ -1,0 +1,101 @@
+syntax = "proto3";
+package payment;
+
+service PaymentService {
+  rpc CreatePayment (CreatePaymentRequest) returns (PaymentResponse);
+  rpc GetTransaction (GetTransactionRequest) returns (PaymentResponse);
+  rpc ListTransactions (ListTransactionsRequest) returns (ListTransactionsResponse);
+  rpc GetTransactionsSummary (TransactionsSummaryRequest) returns (TransactionsSummaryResponse);
+  rpc GetBalance (GetBalanceRequest) returns (BalanceResponse);
+  rpc RequestWithdrawal (RequestWithdrawalRequest) returns (WithdrawalResponse);
+  rpc ApproveWithdrawal (ApproveWithdrawalRequest) returns (WithdrawalResponse);
+  rpc ListWithdrawals (ListWithdrawalsRequest) returns (ListWithdrawalsResponse);
+}
+
+message CreatePaymentRequest {
+  string request_id = 1;
+  string client_id = 2;
+  string idempotency_key = 3;
+  optional string actor_role = 4;
+}
+
+message PaymentResponse {
+  string id = 1;
+  string request_id = 2;
+  string user_id = 3;
+  double amount = 4;
+  string operation_type = 5;
+  string status = 6;
+  string created_at = 7;
+}
+
+message GetTransactionRequest { string transaction_id = 1; }
+
+message ListTransactionsRequest {
+  optional string request_id = 1;
+  optional string user_id = 2;
+  optional string expert_id = 3;
+  optional string status = 4;
+  optional string operation_type = 5;
+  optional double min_amount = 6;
+  optional double max_amount = 7;
+  optional string created_from = 8;
+  optional string created_to = 9;
+  optional string sort_by = 10;
+  optional bool descending = 11;
+  optional int32 limit = 12;
+  optional int32 offset = 13;
+}
+message ListTransactionsResponse { repeated PaymentResponse transactions = 1; }
+
+message TransactionsSummaryRequest {
+  optional string request_id = 1;
+  optional string user_id = 2;
+  optional string expert_id = 3;
+  optional string status = 4;
+  optional string operation_type = 5;
+}
+message TransactionsSummaryResponse {
+  int32 count = 1;
+  double total_amount = 2;
+  map<string, double> by_status = 3;
+  map<string, double> by_type = 4;
+}
+
+message GetBalanceRequest { string expert_id = 1; }
+message BalanceResponse {
+  string expert_id = 1;
+  double earned = 2;
+  double commission = 3;
+  double withdrawn = 4;
+  double pending = 5;
+  double available = 6;
+}
+
+message RequestWithdrawalRequest {
+  string expert_id = 1;
+  double amount = 2;
+  optional string actor_role = 3;
+}
+
+message ApproveWithdrawalRequest {
+  string withdrawal_id = 1;
+  string admin_id = 2;
+  optional string actor_role = 3;
+}
+
+message WithdrawalResponse {
+  string id = 1;
+  string expert_id = 2;
+  double amount = 3;
+  string status = 4;
+  string created_at = 5;
+  optional string processed_at = 6;
+}
+
+message ListWithdrawalsRequest {
+  optional string expert_id = 1;
+  optional string status = 2;
+  optional bool descending = 3;
+}
+message ListWithdrawalsResponse { repeated WithdrawalResponse withdrawals = 1; }

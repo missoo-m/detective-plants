@@ -1,18 +1,54 @@
+import argparse
+import logging
+import signal
+import threading
 
-from .database import init_db
+from . import config
+from .database import get_session_factory, init_db
+from .grpc_server import registration
+from .grpc_support import build_server
+from .logging_setup import configure_logging
 from .seed import seed
 from .service import AdminService
+from .events import KafkaProducer, OutboxRelay, ensure_topics
+
+log = logging.getLogger(config.SERVICE_NAME)
 
 
-def main() -> None:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Admin Service")
+    parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
+    args = parser.parse_args(argv)
+    configure_logging(config.SERVICE_NAME)
+
     init_db()
-    print("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if config.SEED_ON_START or args.init_only:
+        log.info("Тестовые данные добавлены" if seed() else "Тестовые данные уже есть")
+    if args.init_only:
+        return 0
 
-    service = AdminService()
-    print("\nЗаявки на статус эксперта, ожидающие проверки:")
-    for a in service.list_applications(status="PENDING"):
-        print(f"  {a.documents_url} (подана {a.submitted_at})")
+    factory = get_session_factory()
+    service = AdminService(factory)
+    registrars, names = registration(service)
+    workers = []
+    ensure_topics()
+    workers.append(OutboxRelay(factory, KafkaProducer()))
+    for worker in workers:
+        worker.start()
+    server, port = build_server(registrars, config.GRPC_PORT, names, config.INTERNAL_API_KEY)
+    server.start()
+    log.info("%s: gRPC слушает порт %s", config.SERVICE_NAME, port)
+
+    stop = threading.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop.set())
+    stop.wait()
+    log.info("Остановка...")
+    server.stop(5).wait()
+    for worker in workers:
+        worker.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

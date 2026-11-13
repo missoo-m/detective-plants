@@ -1,0 +1,104 @@
+syntax = "proto3";
+package request;
+
+service RequestService {
+  rpc CreateRequest (CreateRequestRequest) returns (RequestResponse);
+  rpc GetRequest (GetRequestRequest) returns (RequestResponse);
+  rpc GetRequestDetails (GetRequestDetailsRequest) returns (RequestDetailsResponse);
+  rpc ListRequests (ListRequestsRequest) returns (ListRequestsResponse);
+  rpc ListAvailableRequests (ListRequestsRequest) returns (ListRequestsResponse);
+  rpc GetRequestsSummary (RequestsSummaryRequest) returns (RequestsSummaryResponse);
+  rpc SelectExpert (SelectExpertRequest) returns (RequestResponse);
+  rpc CancelRequest (CancelRequestRequest) returns (RequestResponse);
+  rpc AddPhoto (AddPhotoRequest) returns (PhotoResponse);
+  rpc GetDisease (GetDiseaseRequest) returns (DiseaseResponse);
+  rpc ListDiseases (EmptyRequest) returns (ListDiseasesResponse);
+}
+
+message EmptyRequest {}
+
+message CreateRequestRequest {
+  string client_id = 1;
+  string symptoms = 2;
+  repeated string photo_urls = 3;
+  optional string actor_role = 4;
+}
+
+message GetRequestRequest { string request_id = 1; }
+
+message PhotoResponse {
+  string id = 1;
+  string url = 2;
+  string uploaded_at = 3;
+}
+
+message RequestResponse {
+  string id = 1;
+  string client_id = 2;
+  optional string expert_id = 3;
+  string symptoms = 4;
+  string status = 5;
+  string created_at = 6;
+  optional string ai_prediagnosis = 7;
+  optional string completed_at = 8;
+  repeated PhotoResponse photos = 9;
+}
+
+message GetRequestDetailsRequest { string request_id = 1; }
+message RequestDetailsResponse {
+  RequestResponse request = 1;
+  repeated string photo_urls = 2;
+  optional string ai_prediagnosis = 3;
+}
+
+message ListRequestsRequest {
+  optional string client_id = 1;
+  optional string expert_id = 2;
+  repeated string statuses = 3;
+  optional string search = 4;
+  optional string created_from = 5;
+  optional string created_to = 6;
+  optional bool has_expert = 7;
+  optional string sort_by = 8;
+  optional bool descending = 9;
+  optional int32 limit = 10;
+  optional int32 offset = 11;
+}
+message ListRequestsResponse { repeated RequestResponse requests = 1; }
+
+message RequestsSummaryRequest {
+  optional string client_id = 1;
+  optional string expert_id = 2;
+}
+message RequestsSummaryResponse {
+  int32 total = 1;
+  map<string, int32> by_status = 2;
+}
+
+message SelectExpertRequest {
+  string request_id = 1;
+  string expert_id = 2;
+  string client_id = 3;
+}
+
+message CancelRequestRequest {
+  string request_id = 1;
+  string client_id = 2;
+}
+
+message AddPhotoRequest {
+  string request_id = 1;
+  string client_id = 2;
+  string file_name = 3;
+  bytes content = 4;
+}
+
+message GetDiseaseRequest { string disease_id = 1; }
+message DiseaseResponse {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+  optional string symptoms = 4;
+  optional string treatment = 5;
+}
+message ListDiseasesResponse { repeated DiseaseResponse diseases = 1; }
