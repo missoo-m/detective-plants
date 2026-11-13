@@ -1,10 +1,9 @@
 import os
 
 SERVICE_NAME = "request-service"
-
 DATABASE_URL = os.getenv(
     "REQUEST_DATABASE_URL",
-    "postgresql://request:request_pass@127.0.0.1:5542/request_db",
+    "postgresql://request:request_pass@localhost:5542/request_db",
 )
 SQL_ECHO = os.getenv("SQL_ECHO", "0") == "1"
 
@@ -30,3 +29,11 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_SECURE = os.getenv("MINIO_SECURE", "0") == "1"
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "plant-photos")
 MINIO_PUBLIC_URL = os.getenv("MINIO_PUBLIC_URL", "http://localhost:9000")
+
+
+GRPC_RETRIES = int(os.getenv("GRPC_RETRIES", "2"))
+GRPC_BACKOFF_BASE = float(os.getenv("GRPC_BACKOFF_BASE", "0.2"))
+GRPC_BACKOFF_MAX = float(os.getenv("GRPC_BACKOFF_MAX", "2"))
+CACHE_ENABLED = os.getenv("CACHE_ENABLED", "1") == "1"
+REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", "redis://localhost:6379/1")
+REDIS_TIMEOUT_SECONDS = float(os.getenv("REDIS_TIMEOUT_SECONDS", "0.3"))

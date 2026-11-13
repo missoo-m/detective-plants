@@ -72,8 +72,49 @@ def test_relay_publishes_in_order_and_survives_kafka_outage(service):
                 raise RuntimeError("Kafka недоступна")
             sent.append((topic, key, json.loads(body)["event_type"]))
 
-    relay = OutboxRelay(service._session_factory, Producer())
+    now = [0.0]
+    relay = OutboxRelay(service._session_factory, Producer(), clock=lambda: now[0])
     assert relay.flush_once() == 0 and sent == []
     state["down"] = False
+    assert relay.flush_once() == 0
+    now[0] = 1.0
     assert relay.flush_once() == 1 and sent == [("request.events", R1, "ExpertSelected")]
     assert relay.flush_once() == 0
+
+
+def test_payment_for_cancelled_request_publishes_rejection(service, consumer):
+    service.cancel_request(R1, U1)
+    assert send(consumer, "PaymentCompleted", request_id=R1, client_id=U1, expert_id=U2, amount=25.0,
+                transaction_id="tx-1") == "handled"
+    assert service.get_request(R1).status == "CANCELLED"
+    [event] = outbox(service._session_factory, "PaymentRejected")
+    assert event["payload"]["transaction_id"] == "tx-1" and event["payload"]["request_id"] == R1
+    assert "CANCELLED" in event["payload"]["reason"]
+
+
+def test_rejected_events_are_kept_in_dead_letters_and_can_be_replayed(service, consumer):
+    from app.models import DeadLetter
+    unknown = str(sid("req-404"))
+    assert send(consumer, "PaymentCompleted", request_id=unknown) == "rejected"
+    with service._session_factory() as session:
+        letters = session.query(DeadLetter).all()
+    assert len(letters) == 1 and "не найден" in letters[0].reason and letters[0].replayed_at is None
+    assert consumer.replay_dead_letters()["still_failing"] == 1
+
+
+def test_event_carries_correlation_id_of_the_scenario(service):
+    from app import logging_setup
+    token = logging_setup.correlation_id.set("scenario-77")
+    try:
+        service.select_expert(R1, U1, U2)
+    finally:
+        logging_setup.correlation_id.reset(token)
+    assert outbox(service._session_factory, "ExpertSelected")[0]["correlation_id"] == "scenario-77"
+
+
+def test_disease_directory_is_cached(service):
+    from app import cache
+    disease = str(sid("dis-1"))
+    first = service.get_disease(disease)
+    assert service.get_disease(disease) == first and cache.get_cache().stats()["hits"] == 1
+    assert len(service.list_diseases()) >= 1 and service.list_diseases() == service.list_diseases()

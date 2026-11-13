@@ -1,5 +1,7 @@
 import os
 from datetime import datetime
+import dataclasses
+import logging
 from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
@@ -7,6 +9,7 @@ from sqlalchemy.orm import Session
 from . import config
 from .clients import AiClient, AuthClient, ExpertClient, GrpcAuthClient, GrpcExpertClient, KeywordAiClassifier
 from .database import get_session_factory
+from .cache import Cache, get_cache
 from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import Disease, Request, RequestPhoto, utcnow
@@ -16,6 +19,7 @@ from .schemas import DiseaseDTO, PhotoDTO, RequestDetailsDTO, RequestDTO, Reques
 from .utils import fmt_dt, parse_uuid
 
 REQUEST_STATUSES = {"CREATED", "PENDING", "IN_PROGRESS", "DONE", "CANCELLED"}
+log = logging.getLogger("request")
 ACTIVE_STATUSES = ["CREATED", "PENDING", "IN_PROGRESS"]
 TRANSITIONS = {
     "CREATED": {"PENDING", "CANCELLED"},
@@ -42,8 +46,9 @@ def _to_disease_dto(d: Disease) -> DiseaseDTO:
 class RequestService:
     def __init__(self, session_factory: Optional[Callable[[], Session]] = None, auth: Optional[AuthClient] = None,
                  expert: Optional[ExpertClient] = None, storage: Optional[StorageClient] = None,
-                 ai: Optional[AiClient] = None):
+                 ai: Optional[AiClient] = None, cache: Optional[Cache] = None):
         self._session_factory = session_factory or get_session_factory()
+        self._cache = cache or get_cache()
         self._auth = auth or GrpcAuthClient()
         self._expert = expert or GrpcExpertClient()
         self._storage = storage or MinioStorage()
@@ -121,16 +126,26 @@ class RequestService:
             by_status = RequestRepository(session).count_by_status(cid, eid)
         return RequestsSummaryDTO(total=sum(by_status.values()), by_status=by_status)
 
+    DISEASE_TTL = 3600
+
     def get_disease(self, disease_id: str) -> DiseaseDTO:
-        with self._session_factory() as session:
-            disease = DiseaseRepository(session).get_by_id(parse_uuid(disease_id))
-            if disease is None:
-                raise NotFoundError(f"Болезнь {disease_id} не найдена")
-            return _to_disease_dto(disease)
+        did = parse_uuid(disease_id)
+
+        def load():
+            with self._session_factory() as session:
+                disease = DiseaseRepository(session).get_by_id(did)
+                if disease is None:
+                    raise NotFoundError(f"Болезнь {disease_id} не найдена")
+                return dataclasses.asdict(_to_disease_dto(disease))
+
+        return DiseaseDTO(**self._cache.get_or_load(f"disease:{did}", self.DISEASE_TTL, load))
 
     def list_diseases(self) -> list[DiseaseDTO]:
-        with self._session_factory() as session:
-            return [_to_disease_dto(d) for d in DiseaseRepository(session).list_all()]
+        def load():
+            with self._session_factory() as session:
+                return [dataclasses.asdict(_to_disease_dto(d)) for d in DiseaseRepository(session).list_all()]
+
+        return [DiseaseDTO(**d) for d in self._cache.get_or_load("diseases:all", self.DISEASE_TTL, load)]
 
     def create_request(self, client_id: str, symptoms: str, photo_urls: Optional[list] = None,
                        actor_role: Optional[str] = None) -> RequestDTO:
@@ -227,14 +242,25 @@ class RequestService:
             session.commit()
             return _to_request_dto(req)
 
-    def apply_payment(self, request_id: str) -> Optional[RequestDTO]:
+    def apply_payment(self, request_id: str, transaction_id: Optional[str] = None,
+                      client_id: Optional[str] = None) -> Optional[RequestDTO]:
         with self._session_factory() as session:
             req = self._load(RequestRepository(session), request_id)
-            if req.status != "PENDING":
+            if req.status == "PENDING":
+                self._change_status(req, "IN_PROGRESS")
+                session.commit()
+                log.info("Заявка %s принята в работу (оплата %s)", request_id, transaction_id)
+                return _to_request_dto(req)
+            if req.status in ("IN_PROGRESS", "DONE"):
                 return None
-            self._change_status(req, "IN_PROGRESS")
-            session.commit()
-            return _to_request_dto(req)
+            log.warning("Оплата %s для заявки %s в статусе %s: платёж будет возвращён", transaction_id, request_id,
+                        req.status)
+            if transaction_id:
+                add_event(session, "PaymentRejected", {
+                    "transaction_id": transaction_id, "request_id": request_id, "client_id": client_id,
+                    "reason": f"Заявка в статусе {req.status} не может быть принята в работу"})
+                session.commit()
+            return None
 
     def apply_tracker_completed(self, request_id: str) -> Optional[RequestDTO]:
         with self._session_factory() as session:
