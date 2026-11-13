@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from . import config
+from .cache import Cache, get_cache
 from .grpc_support import ServiceChannel, message_to_dict
 
 
@@ -37,8 +38,12 @@ class GrpcAuthClient(AuthClient):
 
 class GrpcRequestClient(RequestClient):
 
-    def __init__(self, target: Optional[str] = None, channel: Optional[ServiceChannel] = None):
+    DISEASE_TTL = 3600
+
+    def __init__(self, target: Optional[str] = None, channel: Optional[ServiceChannel] = None,
+                 cache: Optional[Cache] = None):
         from .proto import request_pb2 as pb, request_pb2_grpc as pb_grpc
+        self._cache = cache or get_cache()
         self._pb = pb
         self._channel = channel or ServiceChannel(target or config.REQUEST_GRPC_ADDR, "request-service")
         self._stub = self._channel.stub(pb_grpc.RequestServiceStub)
@@ -49,6 +54,9 @@ class GrpcRequestClient(RequestClient):
         return {**reply["request"], "photo_urls": reply["photo_urls"], "ai_prediagnosis": reply["ai_prediagnosis"]}
 
     def get_disease(self, disease_id: str) -> dict:
-        reply = message_to_dict(self._channel.call(
-            self._stub.GetDisease, self._pb.GetDiseaseRequest(disease_id=disease_id), idempotent=True))
-        return {"id": reply["id"], "name": reply["name"]}
+        def load():
+            reply = message_to_dict(self._channel.call(
+                self._stub.GetDisease, self._pb.GetDiseaseRequest(disease_id=disease_id), idempotent=True))
+            return {"id": reply["id"], "name": reply["name"]}
+
+        return self._cache.get_or_load(f"disease:{disease_id}", self.DISEASE_TTL, load)
