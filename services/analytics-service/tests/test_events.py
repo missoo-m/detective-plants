@@ -48,7 +48,7 @@ def test_expert_counters_follow_events(service, consumer):
     assert consumer.process(raw) == "handled" and consumer.process(raw) == "duplicate"
     after = service.get_expert_stats(U2)
     assert after.total_requests == before.total_requests + 1
-    assert after.completed_requests == before.completed_requests + 1      
+    assert after.completed_requests == before.completed_requests + 1
 
 
 def test_new_expert_gets_stats_row(service, consumer):
@@ -64,3 +64,13 @@ def test_disease_and_payment_counters(service, consumer):
     counters = {(c.event_type): c for c in service.event_counters()}
     assert counters["PaymentCompleted"].count == 2 and counters["PaymentCompleted"].amount == 40.0
     assert counters["DiagnosisCreated"].count == 1
+
+
+def test_aggregates_are_cached_and_reset_after_event(service, consumer):
+    from app import cache
+    before = service.platform_summary()
+    assert service.platform_summary() == before and cache.get_cache().stats()["hits"] == 1
+    send(consumer, "ExpertSelected", request_id="r", expert_id=U2, client_id="c")
+    assert service.platform_summary().total_requests == before.total_requests
+    service.invalidate_cache()
+    assert service.platform_summary().total_requests == before.total_requests + 1

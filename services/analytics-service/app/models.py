@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import Column, DateTime, Float, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -28,7 +28,7 @@ class DiseaseStats(Base):
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     disease_id = Column(Uuid(as_uuid=True), nullable=False)
     count = Column(Integer, default=0)
-    period = Column(String(20), nullable=False)     
+    period = Column(String(20), nullable=False)
 
 
 class ProcessedEvent(Base):
@@ -45,6 +45,18 @@ class EventCounter(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_type = Column(String(50), nullable=False)
-    period = Column(String(20), nullable=False)        
+    period = Column(String(20), nullable=False)
     count = Column(Integer, nullable=False, default=0)
     amount = Column(Float, nullable=False, default=0)
+
+
+class DeadLetter(Base):
+    __tablename__ = "dead_letters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(64))
+    event_type = Column(String(50))
+    reason = Column(Text, nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+    replayed_at = Column(DateTime)
