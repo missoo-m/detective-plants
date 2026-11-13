@@ -47,7 +47,7 @@ message ListMeasurementsResponse { repeated MeasurementResponse measurements = 1
 message RecordMeasurementRequest {
   string field_id = 1;
   double ndvi_value = 2;
-  optional string measured_at = 3;   
+  optional string measured_at = 3;
 }
 
 message AlertResponse {

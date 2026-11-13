@@ -15,7 +15,7 @@ service PaymentService {
 message CreatePaymentRequest {
   string request_id = 1;
   string client_id = 2;
-  string idempotency_key = 3;        
+  string idempotency_key = 3;
   optional string actor_role = 4;
 }
 

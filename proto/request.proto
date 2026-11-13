@@ -21,7 +21,7 @@ message CreateRequestRequest {
   string client_id = 1;
   string symptoms = 2;
   repeated string photo_urls = 3;
-  optional string actor_role = 4;  
+  optional string actor_role = 4;
 }
 
 message GetRequestRequest { string request_id = 1; }
@@ -56,7 +56,7 @@ message ListRequestsRequest {
   optional string expert_id = 2;
   repeated string statuses = 3;
   optional string search = 4;
-  optional string created_from = 5;   
+  optional string created_from = 5;
   optional string created_to = 6;
   optional bool has_expert = 7;
   optional string sort_by = 8;

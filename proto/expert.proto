@@ -4,7 +4,7 @@ package expert;
 service ExpertService {
   rpc RespondToRequest (RespondToRequestRequest) returns (ExpertResponseMsg);
   rpc CreateDiagnosis (CreateDiagnosisRequest) returns (DiagnosisResponse);
-  rpc GetDiagnosis (GetDiagnosisRequest) returns (DiagnosisResponse);          
+  rpc GetDiagnosis (GetDiagnosisRequest) returns (DiagnosisResponse);
   rpc GetDiagnosisById (GetDiagnosisByIdRequest) returns (DiagnosisResponse);
   rpc AddTreatmentStep (AddTreatmentStepRequest) returns (TreatmentStepResponse);
   rpc ListResponses (ListResponsesRequest) returns (ListResponsesResponse);

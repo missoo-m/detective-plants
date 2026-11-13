@@ -67,8 +67,8 @@ message LoginRequest {
 }
 
 message AuthResponse {
-  string token = 1;                   
-  optional string refresh_token = 2;  
+  string token = 1;
+  optional string refresh_token = 2;
   UserResponse user = 3;
   int32 expires_in = 4;
   string session_id = 5;
