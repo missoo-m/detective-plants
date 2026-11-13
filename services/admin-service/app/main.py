@@ -7,6 +7,7 @@ from . import config
 from .database import get_session_factory, init_db
 from .grpc_server import registration
 from .grpc_support import build_server
+from .logging_setup import configure_logging
 from .seed import seed
 from .service import AdminService
 from .events import KafkaProducer, OutboxRelay, ensure_topics
@@ -18,7 +19,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Admin Service")
     parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configure_logging(config.SERVICE_NAME)
 
     init_db()
     if config.SEED_ON_START or args.init_only:
@@ -27,7 +28,7 @@ def main(argv=None) -> int:
         return 0
 
     factory = get_session_factory()
-    service = AdminService(factory)                
+    service = AdminService(factory)
     registrars, names = registration(service)
     workers = []
     ensure_topics()

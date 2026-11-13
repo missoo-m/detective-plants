@@ -96,14 +96,14 @@ class AdminService:
             app.status = "APPROVED" if approve else "REJECTED"
             app.verified_at = utcnow()
             result, user_id = _dto(app), str(app.user_id)
-            if approve:                                   
+            if approve:
                 add_event(session, "ExpertVerified", {"application_id": result.id, "user_id": user_id,
                                                       "admin_id": admin_id, "verified_at": result.verified_at})
             session.commit()
         if approve:
-            try:                                         
+            try:
                 self._auth.assign_role(user_id, "EXPERT")
-            except ServiceUnavailableError as error:      
+            except ServiceUnavailableError as error:
                 log.warning("Auth Service недоступен, роль EXPERT будет выдана по событию: %s", error)
         return result
 
@@ -115,7 +115,7 @@ class AdminService:
             raise BusinessRuleError("Администратора заблокировать нельзя")
         if target["status"] == "BLOCKED":
             raise BusinessRuleError("Пользователь уже заблокирован")
-        self._auth.set_status(user_id, "BLOCKED")             
+        self._auth.set_status(user_id, "BLOCKED")
         with self._session_factory() as session:
             add_event(session, "UserBlocked", {"user_id": user_id, "admin_id": admin_id,
                                                "blocked_at": fmt_dt(utcnow())})

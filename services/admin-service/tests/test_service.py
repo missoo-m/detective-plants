@@ -31,7 +31,7 @@ def service(auth):
 
 
 def test_filters_sort_summary(service):
-    assert [a.status for a in service.list_applications()] == ["PENDING", "APPROVED"]           
+    assert [a.status for a in service.list_applications()] == ["PENDING", "APPROVED"]
     assert [a.status for a in service.list_applications(descending=False)] == ["APPROVED", "PENDING"]
     assert len(service.list_applications(status="PENDING")) == 1
     assert len(service.list_applications(submitted_from=datetime(2026, 1, 10))) == 1
@@ -47,11 +47,11 @@ def test_submit_application(service):
     app = service.submit_application(U1, "https://minio/docs/user-1.pdf")
     assert app.status == "PENDING" and app.user_id == U1
     with pytest.raises(BusinessRuleError):
-        service.submit_application(U1, "https://minio/docs/again.pdf")      
+        service.submit_application(U1, "https://minio/docs/again.pdf")
     with pytest.raises(BusinessRuleError):
-        service.submit_application(U2, "https://minio/docs/user-2.pdf")    
+        service.submit_application(U2, "https://minio/docs/user-2.pdf")
     with pytest.raises(PermissionDeniedError):
-        service.submit_application(U5, "https://minio/docs/user-5.pdf")    
+        service.submit_application(U5, "https://minio/docs/user-5.pdf")
     with pytest.raises(InvalidValueError):
         service.submit_application(U4, "ftp://nope")
 
@@ -59,16 +59,16 @@ def test_submit_application(service):
 def test_verify_expert_approve(service, auth):
     result = service.verify_expert(APP1, U3, approve=True)
     assert result.status == "APPROVED" and result.verified_at is not None
-    assert auth.users[U4][0] == "EXPERT"                                    
+    assert auth.users[U4][0] == "EXPERT"
     assert outbox(service._session_factory, "ExpertVerified")[0]["payload"]["user_id"] == U4
     with pytest.raises(BusinessRuleError):
-        service.verify_expert(APP1, U3, approve=True)                       
+        service.verify_expert(APP1, U3, approve=True)
 
 
 def test_verify_expert_reject_and_resubmit(service, auth):
     assert service.verify_expert(APP1, U3, approve=False).status == "REJECTED"
     assert auth.users[U4][0] == "CLIENT" and outbox(service._session_factory, "ExpertVerified") == []
-    again = service.submit_application(U4, "https://minio/docs/user-4-v2.pdf")   
+    again = service.submit_application(U4, "https://minio/docs/user-4-v2.pdf")
     assert again.status == "PENDING" and again.id == APP1
 
 
@@ -83,9 +83,9 @@ def test_block_user(service, auth):
     assert service.block_user(U3, U1)["status"] == "BLOCKED" and auth.users[U1][1] == "BLOCKED"
     assert outbox(service._session_factory, "UserBlocked")[0]["payload"]["user_id"] == U1
     with pytest.raises(BusinessRuleError):
-        service.block_user(U3, U1)                                          
+        service.block_user(U3, U1)
     with pytest.raises(BusinessRuleError):
-        service.block_user(U3, U3)                                          
+        service.block_user(U3, U3)
     with pytest.raises(PermissionDeniedError):
         service.block_user(U2, U4)
 
