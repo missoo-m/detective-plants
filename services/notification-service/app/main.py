@@ -7,6 +7,7 @@ from . import config
 from .database import get_session_factory, init_db
 from .grpc_server import registration
 from .grpc_support import build_server
+from .logging_setup import configure_logging
 from .seed import seed
 from .service import NotificationService
 from .events import EventConsumer, KafkaProducer, ensure_topics
@@ -17,9 +18,11 @@ log = logging.getLogger(config.SERVICE_NAME)
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Notification Service")
+    parser.add_argument("--replay-dead-letters", action="store_true",
+                        help="повторно обработать необработанные события из таблицы dead_letters и завершиться")
     parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configure_logging(config.SERVICE_NAME)
 
     init_db()
     if config.SEED_ON_START or args.init_only:
@@ -29,6 +32,10 @@ def main(argv=None) -> int:
 
     factory = get_session_factory()
     service = NotificationService(factory)
+    if args.replay_dead_letters:
+        EventConsumer(factory, build_handlers(service)).replay_dead_letters()
+        return 0
+
     registrars, names = registration(service)
     workers = []
     ensure_topics()

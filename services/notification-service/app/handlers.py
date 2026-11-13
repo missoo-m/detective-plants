@@ -55,6 +55,10 @@ def build_handlers(service=None):
         _notify(s, e["payload"]["expert_id"], "WITHDRAWAL_APPROVED",
                 f"Вывод {e['payload']['amount']} BYN одобрен администратором.")
 
+    def payment_refunded(e, s):
+        p = e["payload"]
+        _notify(s, p["client_id"], "PAYMENT_REFUNDED", f"Платёж {p['amount']} {p['currency']} возвращён: {p['reason']}")
+
     def expert_verified(e, s):
         _notify(s, e["payload"]["user_id"], "EXPERT_VERIFIED", "Вы подтверждены как эксперт.")
 
@@ -70,4 +74,4 @@ def build_handlers(service=None):
             "TrackerCreated": tracker_created, "PhotoUploaded": photo_uploaded,
             "TrackerCompleted": tracker_completed, "MessageSent": message_sent,
             "WithdrawalRequested": withdrawal_requested, "WithdrawalApproved": withdrawal_approved,
-            "ExpertVerified": expert_verified, "UserBlocked": user_blocked, "SatelliteAlertCreated": satellite_alert}
+            "PaymentRefunded": payment_refunded, "ExpertVerified": expert_verified, "UserBlocked": user_blocked, "SatelliteAlertCreated": satellite_alert}
