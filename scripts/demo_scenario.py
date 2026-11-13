@@ -8,8 +8,11 @@ import uuid
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000/graphql"
 
 
+CORRELATION = {"id": "demo"}
+
+
 def gql(query: str, variables: dict = None, token: str = None) -> dict:
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "X-Correlation-ID": CORRELATION["id"]}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(URL, json.dumps({"query": query, "variables": variables or {}}).encode(), headers)
@@ -34,22 +37,20 @@ def wait_for(description: str, probe, timeout: float = 20.0):
     while time.time() - started < timeout:
         value = probe()
         if value:
-            print(f"{description} (через {time.time() - started:.1f} с)")
+            print(f"    ✓ {description} (через {time.time() - started:.1f} с)")
             return value
         time.sleep(0.3)
-    sys.exit(f"Не дождались: {description}. Проверьте, что Kafka и все сервисы запущены.")
+    sys.exit(f"    ✗ Не дождались: {description}. Проверьте, что Kafka и все сервисы запущены.")
 
 
 def step(text: str) -> None:
-    print(f"\n {text}")
+    CORRELATION["id"] = f"demo-{uuid.uuid4().hex[:8]}"
+    print(f"\n▶ {text}\n    correlation_id = {CORRELATION['id']}   (python scripts/trace.py {CORRELATION['id']})")
 
 
 def main() -> None:
-    DISEASE = str(uuid.uuid5(uuid.NAMESPACE_URL, "plant-detective/dis-1"))   
-    client_email = f"client-{uuid.uuid4().hex[:8]}@example.com"
-    gql("mutation($i: RegisterInput!){ register(input:$i){ user{ id } } }",
-    {"i": {"email": client_email, "password": "password123", "name": "Пётр Огородников"}})
-    client_token, client = login(client_email)
+    DISEASE = str(uuid.uuid5(uuid.NAMESPACE_URL, "plant-detective/dis-1"))
+    client_token, client = login("petr@example.com")
     expert_token, expert = login("ivan.expert@example.com")
     admin_token, admin = login("admin@example.com")
     print(f"Клиент: {client['name']}, эксперт: {expert['name']}, администратор: {admin['name']}")
@@ -117,7 +118,7 @@ def main() -> None:
     step("9. Администратор блокирует пользователя: сессии завершаются сразу (gRPC Admin→Auth)")
     email = f"demo-{uuid.uuid4().hex[:8]}@example.com"
     gql("mutation($i: RegisterInput!){ register(input:$i){ user{ id } } }",
-        {"i": {"email": email, "password": "password123", "name": "Демо Пользователь"}})      
+        {"i": {"email": email, "password": "password123", "name": "Демо Пользователь"}})
     victim_token, victim = login(email)
     gql("mutation($u: ID!){ blockUser(userId:$u){ id status } }", {"u": victim["id"]}, admin_token)
     try:

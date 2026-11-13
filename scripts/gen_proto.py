@@ -29,7 +29,7 @@ def generate(project: Path, protos: list) -> None:
 
 def main() -> int:
     try:
-        import grpc_tools  
+        import grpc_tools
     except ImportError:
         print("Установите grpcio-tools:  pip install -r requirements-dev.txt")
         return 1

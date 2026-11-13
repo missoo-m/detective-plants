@@ -32,7 +32,7 @@ def start_all() -> int:
         for line in process.stdout:
             print(f"[{name}] {line.rstrip()}", flush=True)
 
-    env = dict(os.environ, PYTHONUNBUFFERED="1")
+    env = dict(os.environ, PYTHONUNBUFFERED="1", LOG_DIR=str(ROOT / "logs"))
     launches = [(p.name, p, [sys.executable, "-m", "app.main"]) for p in SERVICES]
     launches.append(("gateway", GATEWAY, [sys.executable, "-m", "uvicorn", "app.main:app", "--port", "8000"]))
     for name, cwd, cmd in launches:
@@ -66,7 +66,7 @@ def main() -> int:
         return start_all()
     if command in COMMANDS:
         return run_each(command)
-    print(__doc__)
+    print("python scripts/run_all.py [gen|init|test|start]")
     return 2
 
 
