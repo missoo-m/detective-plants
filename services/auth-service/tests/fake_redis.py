@@ -1,7 +1,7 @@
 class FakeRedis:
     def __init__(self, clock):
         self._clock = clock
-        self._data = {}        
+        self._data = {}
         self._sets = {}
 
     def _alive(self, key):

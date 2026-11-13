@@ -103,7 +103,7 @@ class RedisSessionStore(SessionStore):
         return session
 
     def get(self, session_id: str) -> Optional[Session]:
-        raw = self._r.get(self._key(session_id))    
+        raw = self._r.get(self._key(session_id))
         return Session.from_json(raw) if raw else None
 
     def touch(self, session_id: str, ttl: int) -> bool:
@@ -133,7 +133,7 @@ class RedisSessionStore(SessionStore):
         for session_id in self._r.smembers(self._user_key(user_id)):
             session = self.get(session_id)
             if session is None:
-                self._r.srem(self._user_key(user_id), session_id)     
+                self._r.srem(self._user_key(user_id), session_id)
             else:
                 result.append(session)
         return sorted(result, key=lambda s: s.created_at)

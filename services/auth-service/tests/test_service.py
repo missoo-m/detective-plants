@@ -86,7 +86,7 @@ def test_authenticate(service):
     with pytest.raises(PermissionDeniedError):
         service.authenticate("nobody@example.com", "password123")
     with pytest.raises(PermissionDeniedError):
-        service.authenticate("oleg@example.com", "password123")        
+        service.authenticate("oleg@example.com", "password123")
 
 
 def test_update_profile(service):
@@ -101,9 +101,9 @@ def test_update_profile(service):
 def test_assign_role_and_status(service):
     assert service.assign_role(str(sid("user-4")), "EXPERT").role == "EXPERT"
     with pytest.raises(BusinessRuleError):
-        service.assign_role(str(sid("user-3")), "CLIENT")            
+        service.assign_role(str(sid("user-3")), "CLIENT")
     assert service.set_status(str(sid("user-1")), "BLOCKED").status == "BLOCKED"
     with pytest.raises(BusinessRuleError):
-        service.set_status(str(sid("user-3")), "BLOCKED")           
+        service.set_status(str(sid("user-3")), "BLOCKED")
     with pytest.raises(InvalidValueError):
         service.set_status(str(sid("user-1")), "UNKNOWN")

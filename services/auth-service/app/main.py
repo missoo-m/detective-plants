@@ -7,6 +7,7 @@ from . import config
 from .database import get_session_factory, init_db
 from .grpc_server import registration
 from .grpc_support import build_server
+from .logging_setup import configure_logging
 from .seed import seed
 from .api import build_manager
 from .events import EventConsumer, KafkaProducer, OutboxRelay, ensure_topics
@@ -17,9 +18,11 @@ log = logging.getLogger(config.SERVICE_NAME)
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Auth Service")
+    parser.add_argument("--replay-dead-letters", action="store_true",
+                        help="повторно обработать необработанные события из таблицы dead_letters и завершиться")
     parser.add_argument("--init-only", action="store_true", help="создать таблицы и тестовые данные и завершиться")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configure_logging(config.SERVICE_NAME)
 
     init_db()
     if config.SEED_ON_START or args.init_only:
@@ -28,21 +31,30 @@ def main(argv=None) -> int:
         return 0
 
     factory = get_session_factory()
-    manager = build_manager()                       
+    manager = build_manager()
     service = manager.directory
     service.session_manager = manager
+    if args.replay_dead_letters:
+        EventConsumer(factory, build_handlers(service)).replay_dead_letters()
+        return 0
+
     registrars, names = registration(service)
     workers = []
     ensure_topics()
     producer = KafkaProducer()
     workers.append(OutboxRelay(factory, producer))
     workers.append(EventConsumer(factory, build_handlers(service), dead_letter_producer=producer))
+
     for worker in workers:
-        print(f"DEBUG bootstrap: {getattr(worker, '_bootstrap', 'NO ATTR')!r}, "
-           f"callable={callable(getattr(worker, '_bootstrap', None))}")
+        print(f"WORKER: {worker!r} type={type(worker).__module__}.{type(worker).__name__} "
+              f"mro={[c.__name__ for c in type(worker).__mro__]} "
+              f"_bootstrap={getattr(worker, '_bootstrap', 'MISSING')!r}", flush=True)
+    for worker in workers:
         worker.start()
+
         
     server, port = build_server(registrars, config.GRPC_PORT, names, config.INTERNAL_API_KEY)
+
     server.start()
     log.info("%s: gRPC слушает порт %s", config.SERVICE_NAME, port)
 

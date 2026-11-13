@@ -1,10 +1,13 @@
+import logging
 import re
 import uuid
+import dataclasses
 from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
 from .database import get_session_factory
+from .cache import Cache, get_cache
 from .events import add_event
 from .errors import BusinessRuleError, InvalidValueError, NotFoundError, PermissionDeniedError
 from .models import Profile, ReferralProfile, User, UserSettings
@@ -31,17 +34,36 @@ def _to_dto(user: User) -> UserDTO:
                    created_at=fmt_dt(user.created_at), profile=profile)
 
 
+def _dto_from_dict(data: dict) -> UserDTO:
+    profile = ProfileDTO(**data["profile"]) if data.get("profile") else None
+    return UserDTO(**{**data, "profile": profile})
+
+
+log = logging.getLogger("auth")
+
+
 class AuthService:
-    def __init__(self, session_factory: Optional[Callable[[], Session]] = None):
+    USER_TTL = 60
+
+    def __init__(self, session_factory: Optional[Callable[[], Session]] = None, cache: Optional[Cache] = None):
         self._session_factory = session_factory or get_session_factory()
+        self._cache = cache or get_cache()
+
+    @staticmethod
+    def _user_key(user_id) -> str:
+        return f"user:{user_id}"
 
     def get_user(self, user_id: str) -> UserDTO:
         uid = parse_uuid(user_id)
-        with self._session_factory() as session:
-            user = UserRepository(session).get_by_id(uid)
-            if user is None:
-                raise NotFoundError(f"Пользователь {user_id} не найден")
-            return _to_dto(user)
+
+        def load():
+            with self._session_factory() as session:
+                user = UserRepository(session).get_by_id(uid)
+                if user is None:
+                    raise NotFoundError(f"Пользователь {user_id} не найден")
+                return dataclasses.asdict(_to_dto(user))
+
+        return _dto_from_dict(self._cache.get_or_load(self._user_key(uid), self.USER_TTL, load))
 
     def list_users(self, role: Optional[str] = None, status: Optional[str] = None,
                    search: Optional[str] = None, sort_by: str = "created_at", descending: bool = False,
@@ -140,6 +162,7 @@ class AuthService:
             if language is not None:
                 user.profile.language = language
             session.commit()
+            self._cache.invalidate(self._user_key(uid))
             return _to_dto(user)
 
     def assign_role(self, user_id: str, role: str) -> UserDTO:
@@ -158,6 +181,8 @@ class AuthService:
                 raise BusinessRuleError(f"Роль {role} не настроена")
             user.role = new_role
             session.commit()
+            self._cache.invalidate(self._user_key(uid))
+            log.info("Роль пользователя %s изменена на %s", user_id, new_role.name if hasattr(new_role, "name") else new_role)
             return _to_dto(user)
 
     def set_status(self, user_id: str, status: str) -> UserDTO:
@@ -172,4 +197,6 @@ class AuthService:
                 raise BusinessRuleError("Администратора нельзя заблокировать")
             user.status = status
             session.commit()
+            self._cache.invalidate(self._user_key(uid))
+            log.info("Статус пользователя %s изменён на %s", user_id, status)
             return _to_dto(user)

@@ -89,9 +89,22 @@ class OutboxEvent(Base):
     published_at = Column(DateTime)
     attempts = Column(Integer, nullable=False, default=0)
 
+
 class ProcessedEvent(Base):
     __tablename__ = "processed_events"
 
     event_id = Column(String(64), primary_key=True)
     event_type = Column(String(50), nullable=False)
     processed_at = Column(DateTime, nullable=False, default=utcnow)
+
+
+class DeadLetter(Base):
+    __tablename__ = "dead_letters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(64))
+    event_type = Column(String(50))
+    reason = Column(Text, nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+    replayed_at = Column(DateTime)

@@ -28,7 +28,7 @@ class SessionManager:
         return _as_dict(self._directory.register(email, password, name))
 
     def login(self, email: str, password: str) -> dict:
-        user = self._directory.authenticate(email, password)          
+        user = self._directory.authenticate(email, password)
         session = self._store.create(user.id, user.role, self._session_ttl)
         now = int(self._clock())
         token = jwt_utils.encode({"sub": user.id, "role": user.role, "sid": session.session_id,

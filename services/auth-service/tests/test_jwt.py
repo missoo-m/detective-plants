@@ -47,4 +47,4 @@ def test_malformed_and_issuer():
     with pytest.raises(InvalidTokenError):
         jwt_utils.decode(make(), SECRET, "another-issuer", now=1000)
     with pytest.raises(InvalidTokenError):
-        jwt_utils.decode(jwt_utils.encode({"sub": "u-1"}, SECRET), SECRET, now=1000)     
+        jwt_utils.decode(jwt_utils.encode({"sub": "u-1"}, SECRET), SECRET, now=1000)

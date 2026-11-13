@@ -51,7 +51,8 @@ def test_block_revokes_sessions_and_role_changes_at_once(api):
     result = channel.call(stub.SetUserStatus, pb.SetUserStatusRequest(user_id=U1, status="BLOCKED"))
     assert result.user.status == "BLOCKED" and result.revoked_sessions == 2 and service.revoked == [U1]
     with pytest.raises(BusinessRuleError):
-        channel.call(stub.SetUserStatus, pb.SetUserStatusRequest(user_id=U3, status="BLOCKED"))  
+        channel.call(stub.SetUserStatus, pb.SetUserStatusRequest(user_id=U3, status="BLOCKED"))
+
 
 def test_verify_token_delegates_to_session_manager(api):
     stub, channel, _ = api

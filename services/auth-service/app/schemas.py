@@ -28,6 +28,7 @@ class ValidationResult:
     role: Optional[str] = None
     status: Optional[str] = None
 
+
 @dataclass
 class UsersSummaryDTO:
     total: int

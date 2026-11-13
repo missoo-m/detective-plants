@@ -52,7 +52,7 @@ def test_register_publishes_user_registered(service):
     user = service.register("new.user@example.com", "strongpass1", "Новый Пользователь")
     [event] = outbox(service._session_factory, "UserRegistered")
     assert event["payload"]["user_id"] == user.id and event["payload"]["email"] == "new.user@example.com"
-    assert "password" not in json.dumps(event)                         
+    assert "password" not in json.dumps(event)
 
 
 def test_expert_verified_event_assigns_role(service, consumer):
@@ -63,3 +63,22 @@ def test_expert_verified_event_assigns_role(service, consumer):
 def test_user_blocked_event_blocks_and_revokes_sessions(service, consumer):
     assert send(consumer, "UserBlocked", user_id=U1, admin_id="x") == "handled"
     assert service.get_user(U1).status == "BLOCKED" and service.revoked == [U1]
+
+
+def test_user_card_is_cached_and_reset_on_block(service):
+    from app import cache
+    first = service.get_user(U1)
+    assert service.get_user(U1) == first and cache.get_cache().stats()["hits"] == 1
+    service.update_profile(U1, name="Новое Имя")       # ← до блокировки, пока ACTIVE
+    assert service.get_user(U1).name == "Новое Имя"
+    service.set_status(U1, "BLOCKED")
+    assert service.get_user(U1).status == "BLOCKED"
+    service.assign_role(U1, "EXPERT")
+    assert service.get_user(U1).role == "EXPERT"
+
+
+def test_unknown_user_is_not_cached(service):
+    from app.errors import NotFoundError
+    for _ in range(2):
+        with pytest.raises(NotFoundError):
+            service.get_user(str(sid("nobody")))
