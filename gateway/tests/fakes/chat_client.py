@@ -33,7 +33,7 @@ MOCK_RULES = [{"id": "rule-1", "name": "Контакты вне платформ
 
 
 class MockChatClient(ChatClientBase):
-    
+
     def __init__(self):
         self.rooms = copy.deepcopy(MOCK_CHAT_ROOMS)
         self.messages = copy.deepcopy(MOCK_MESSAGES)

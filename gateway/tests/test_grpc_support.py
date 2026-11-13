@@ -2,9 +2,9 @@ import pytest
 
 grpc = pytest.importorskip("grpc")
 
-from app.errors import (AuthenticationError, BusinessRuleError, NotFoundError, PermissionDeniedError,  # noqa: E402
+from app.errors import (AuthenticationError, BusinessRuleError, NotFoundError, PermissionDeniedError,
                         ServiceUnavailableError, ValidationError)
-from app.grpc_support import CircuitBreaker, ServiceChannel  # noqa: E402
+from app.grpc_support import CircuitBreaker, ServiceChannel
 
 
 class RpcFailure(grpc.RpcError):
@@ -45,7 +45,7 @@ def test_read_calls_are_retried_but_commands_are_not():
         return "ответ"
     assert channel(retries=2).call(flaky, object(), idempotent=True) == "ответ" and len(calls) == 3
     calls.clear()
-    with pytest.raises(ServiceUnavailableError):                     
+    with pytest.raises(ServiceUnavailableError):
         channel(retries=2).call(flaky, object(), idempotent=False)
     assert len(calls) == 1
 
@@ -70,8 +70,8 @@ def test_circuit_breaker_opens_and_recovers():
     for _ in range(2):
         with pytest.raises(ServiceUnavailableError):
             ch.call(down, object())
-    with pytest.raises(ServiceUnavailableError) as info:             
+    with pytest.raises(ServiceUnavailableError) as info:
         ch.call(lambda *a, **k: "ok", object())
     assert "временно недоступен" in str(info.value)
     now[0] = 11.0
-    assert ch.call(lambda *a, **k: "ok", object()) == "ok"         
+    assert ch.call(lambda *a, **k: "ok", object()) == "ok"

@@ -42,7 +42,7 @@ MOCK_DISEASES = {
 
 
 class MockRequestClient(RequestClientBase):
-    
+
     def __init__(self):
         self.requests = copy.deepcopy(MOCK_REQUESTS)
         self.diseases = copy.deepcopy(MOCK_DISEASES)
@@ -53,7 +53,6 @@ class MockRequestClient(RequestClientBase):
         return clients
 
     def _authorize(self, user_id: str, role: str, actor_role: Optional[str]) -> None:
-        
         if actor_role is None:
             self._require_active(user_id, role)
         elif actor_role != role:

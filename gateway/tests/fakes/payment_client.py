@@ -36,7 +36,7 @@ def _money(value: Decimal) -> Decimal:
 
 
 class MockPaymentClient(PaymentClientBase):
-    
+
     def __init__(self):
         self.transactions = copy.deepcopy(MOCK_TRANSACTIONS)
         self.withdrawals = copy.deepcopy(MOCK_WITHDRAWALS)
@@ -47,7 +47,7 @@ class MockPaymentClient(PaymentClientBase):
         return clients
 
     def _require_role(self, user_id: str, role: str, actor_role: Optional[str] = None) -> None:
-        if actor_role is not None:                      
+        if actor_role is not None:
             if actor_role != role:
                 raise PermissionDeniedError(f"Действие доступно только роли {role}")
             return

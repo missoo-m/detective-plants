@@ -25,9 +25,9 @@ MOCK_TRACKERS = {
 
 
 class MockRecoveryClient(RecoveryClientBase):
-    
+
     def __init__(self):
-        self.trackers = copy.deepcopy(MOCK_TRACKERS)       
+        self.trackers = copy.deepcopy(MOCK_TRACKERS)
 
     @staticmethod
     def _registry():
@@ -44,7 +44,6 @@ class MockRecoveryClient(RecoveryClientBase):
     def _require_active(tracker: dict) -> None:
         if tracker["status"] != "ACTIVE":
             raise BusinessRuleError(f"Трекер уже в статусе {tracker['status']}, изменять его нельзя")
-
 
     def get_tracker(self, tracker_id: str) -> dict:
         return self._find(tracker_id)

@@ -8,10 +8,10 @@ auth_pb2_grpc = pytest.importorskip("app.proto.auth_pb2_grpc")
 request_pb2 = pytest.importorskip("app.proto.request_pb2")
 request_pb2_grpc = pytest.importorskip("app.proto.request_pb2_grpc")
 
-from app.clients.grpc_clients import GrpcAuthClient, GrpcRequestClient  
-from app.errors import NotFoundError, ServiceUnavailableError  
-from app.grpc_support import ServiceChannel 
-from app.security.grpc_client import GrpcAuthSecurityClient 
+from app.clients.grpc_clients import GrpcAuthClient, GrpcRequestClient
+from app.errors import NotFoundError, ServiceUnavailableError
+from app.grpc_support import ServiceChannel
+from app.security.grpc_client import GrpcAuthSecurityClient
 
 
 class FakeAuth(auth_pb2_grpc.AuthServiceServicer):

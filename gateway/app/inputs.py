@@ -8,7 +8,6 @@ from .api_types import (
 )
 
 
-#  сортировка
 @strawberry.enum
 class SortDirection(Enum):
     ASC = "ASC"
@@ -59,12 +58,11 @@ class TransactionSortInput:
     direction: SortDirection = SortDirection.ASC
 
 
-#  фильтры
 @strawberry.input
 class RequestFilterInput:
     statuses: Optional[list[RequestStatus]] = None
-    search: Optional[str] = None                
-    created_from: Optional[str] = None          
+    search: Optional[str] = None
+    created_from: Optional[str] = None
     created_to: Optional[str] = None
     has_expert: Optional[bool] = None
 
@@ -73,7 +71,7 @@ class RequestFilterInput:
 class UserFilterInput:
     role: Optional[Role] = None
     status: Optional[UserStatus] = None
-    search: Optional[str] = None                
+    search: Optional[str] = None
 
 
 @strawberry.input
@@ -81,8 +79,8 @@ class TransactionFilterInput:
     request_id: Optional[strawberry.ID] = None
     user_id: Optional[strawberry.ID] = None
     expert_id: Optional[strawberry.ID] = None
-    status: Optional[str] = None                
-    operation_type: Optional[str] = None         
+    status: Optional[str] = None
+    operation_type: Optional[str] = None
     min_amount: Optional[float] = None
     max_amount: Optional[float] = None
     created_from: Optional[str] = None
@@ -102,7 +100,6 @@ class ApplicationFilterInput:
     submitted_to: Optional[str] = None
 
 
-# бизнес-операции
 @strawberry.input
 class RegisterInput:
     email: str
@@ -192,4 +189,4 @@ class WithdrawalInput:
 @strawberry.input
 class CreateFieldInput:
     name: str
-    geometry: str                                
+    geometry: str

@@ -1,4 +1,3 @@
-"""In-memory двойники внутренних сервисов — ТОЛЬКО для тестов GraphQL-слоя"""
 from app import clients
 
 from .admin_client import MockAdminClient

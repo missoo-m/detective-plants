@@ -74,14 +74,14 @@ def test_session_expires_by_ttl_and_is_extended_by_activity():
     clients.security_client._clock = clock
     token = token_for("user-1")
     clock.now += 1700
-    assert execute("{ me { id } }", token=token).errors is None           
+    assert execute("{ me { id } }", token=token).errors is None
     clock.now += 1700
     assert execute("{ me { id } }", token=token).errors is None
     idle = token_for("user-1")
-    clock.now += 1900                                                       
+    clock.now += 1900
     assert "Сессия" in execute("{ me { id } }", token=idle).errors[0].message
     old = token_for("user-1")
-    clock.now += 3700                                                     
+    clock.now += 3700
     assert code_of(execute("{ me { id } }", token=old)) == "UNAUTHENTICATED"
 
 
@@ -152,7 +152,7 @@ def test_user_cannot_read_other_users_data():
 
 def test_owner_expert_and_admin_have_access():
     assert execute('{ request(id: "req-1") { id } }', user="user-1").errors is None
-    assert execute('{ request(id: "req-1") { id } }', user="user-2").errors is None        
+    assert execute('{ request(id: "req-1") { id } }', user="user-2").errors is None
     assert execute('{ request(id: "req-2") { id } }', user="user-3").errors is None
     assert execute('{ diagnosis(id: "diag-1") { id } }', user="user-2").errors is None
     assert execute('{ expertBalance(expertId: "user-2") { earned } }', user="user-3").errors is None
@@ -172,3 +172,16 @@ def test_data_is_scoped_by_role():
 def test_actor_comes_from_token_not_from_arguments():
     created = execute('mutation { createRequest(input: {symptoms: "Белый налёт на листьях огурцов"}) { id client { id } } }', user="user-4")
     assert created.data["createRequest"]["client"]["id"] == "user-4"
+
+
+def test_auth_service_outage_gives_service_unavailable_not_unauthenticated():
+    from app import clients
+    from app.errors import ServiceUnavailableError
+
+    class DownSecurity:
+        def verify(self, token):
+            raise ServiceUnavailableError("Сервис auth-service недоступен")
+
+    clients.use(security_client=DownSecurity())
+    assert code_of(execute("{ me { id } }", token="any")) == "SERVICE_UNAVAILABLE"
+    assert code_of(execute("{ myRequests { id } }", token="any")) == "SERVICE_UNAVAILABLE"

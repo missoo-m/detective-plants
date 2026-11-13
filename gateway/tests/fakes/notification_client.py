@@ -16,7 +16,7 @@ MOCK_NOTIFICATIONS = [
 
 
 class MockNotificationClient(NotificationClientBase):
-    
+
     def __init__(self):
         self.items = copy.deepcopy(MOCK_NOTIFICATIONS)
 

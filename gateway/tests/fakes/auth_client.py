@@ -34,7 +34,7 @@ MOCK_USERS = {
 
 
 class MockAuthClient(AuthClientBase):
-    
+
     def __init__(self):
         self.users = copy.deepcopy(MOCK_USERS)
         self.passwords = {u["email"]: "password123" for u in self.users.values()}

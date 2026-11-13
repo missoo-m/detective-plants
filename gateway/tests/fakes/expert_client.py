@@ -36,7 +36,7 @@ def _clean_step(step: dict) -> dict:
 
 
 class MockExpertClient(ExpertClientBase):
-    
+
     def __init__(self):
         self.responses = copy.deepcopy(MOCK_RESPONSES)
         self.diagnoses = copy.deepcopy(MOCK_DIAGNOSES)
@@ -47,7 +47,7 @@ class MockExpertClient(ExpertClientBase):
         return clients
 
     def _require_expert(self, expert_id: str, actor_role: Optional[str] = None) -> None:
-        if actor_role is not None:                     
+        if actor_role is not None:
             if actor_role != "EXPERT":
                 raise PermissionDeniedError("Действие доступно только эксперту")
             return

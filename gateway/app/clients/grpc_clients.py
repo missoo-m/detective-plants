@@ -2,6 +2,7 @@ import importlib
 from typing import Optional
 
 from .. import config
+from ..cache import get_cache
 from ..grpc_support import ServiceChannel, build, message_to_dict
 from .base import (AdminClientBase, AnalyticsClientBase, AuthClientBase, ChatClientBase, ExpertClientBase,
                    NotificationClientBase, PaymentClientBase, RecoveryClientBase, RequestClientBase,
@@ -9,8 +10,8 @@ from .base import (AdminClientBase, AnalyticsClientBase, AuthClientBase, ChatCli
 
 
 class GrpcServiceClient:
-    SERVICE = ""            
-    STUB = ""               
+    SERVICE = ""
+    STUB = ""
 
     def __init__(self, target: Optional[str] = None, channel: Optional[ServiceChannel] = None):
         self.pb = importlib.import_module(f"..proto.{self.SERVICE}_pb2", package=__package__)
@@ -86,7 +87,8 @@ class GrpcRequestClient(GrpcServiceClient, RequestClientBase):
                                                       expert_id=expert_id))
 
     def get_disease(self, disease_id):
-        return self._read("GetDisease", build(self.pb.GetDiseaseRequest, disease_id=disease_id))
+        return get_cache().get_or_load(f"disease:{disease_id}", 3600, lambda: self._read(
+            "GetDisease", build(self.pb.GetDiseaseRequest, disease_id=disease_id)))
 
     def create_request(self, client_id, symptoms, photo_urls, actor_role=None):
         return self._call("CreateRequest", build(self.pb.CreateRequestRequest, client_id=client_id, symptoms=symptoms,

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from ..errors import NotFoundError  
+from ..errors import NotFoundError
 
 
 class AuthClientBase(ABC):

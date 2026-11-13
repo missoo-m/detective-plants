@@ -22,7 +22,7 @@ def _unb64(part: str) -> bytes:
 class MockAuthSecurityClient(AuthSecurityClient):
     def __init__(self, directory_provider: Callable[[], object], secret: Optional[str] = None,
                  session_ttl: Optional[int] = None, jwt_ttl: int = 3600, clock: Callable[[], float] = time.time):
-        self._directory = directory_provider         
+        self._directory = directory_provider
         self._secret = (secret or "mock-secret-change-me").encode()
         self._session_ttl = session_ttl or 1800
         self._jwt_ttl, self._clock = jwt_ttl, clock
@@ -54,7 +54,7 @@ class MockAuthSecurityClient(AuthSecurityClient):
         return self._directory().register(email, password, name)
 
     def login(self, email: str, password: str) -> dict:
-        user = self._directory().login(email, password)["user"]           
+        user = self._directory().login(email, password)["user"]
         session_id, now = uuid.uuid4().hex, int(self._clock())
         self.sessions[session_id] = {"user_id": user["id"], "expires_at": self._clock() + self._session_ttl}
         token = self._encode({"sub": user["id"], "role": user["role"], "sid": session_id, "iat": now,
@@ -75,7 +75,7 @@ class MockAuthSecurityClient(AuthSecurityClient):
         if user["status"] != "ACTIVE":
             self.revoke_user_sessions(user["id"])
             raise AuthenticationError("Учётная запись заблокирована")
-        session["expires_at"] = self._clock() + self._session_ttl         
+        session["expires_at"] = self._clock() + self._session_ttl
         return Identity(user_id=user["id"], role=user["role"], session_id=claims["sid"])
 
     def logout(self, token: str) -> bool:

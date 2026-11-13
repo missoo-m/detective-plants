@@ -1,4 +1,4 @@
-from ..errors import NotFoundError  
+from ..errors import NotFoundError
 from ..security.client import AuthSecurityClient
 from .base import (
     AdminClientBase, AnalyticsClientBase, AuthClientBase, ChatClientBase, ExpertClientBase,

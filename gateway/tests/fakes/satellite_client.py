@@ -47,7 +47,7 @@ def validate_polygon(geometry: str) -> None:
 
 
 class MockSatelliteClient(SatelliteClientBase):
-    
+
     def __init__(self):
         self.fields = copy.deepcopy(MOCK_FIELDS)
         self.measurements = copy.deepcopy(MOCK_MEASUREMENTS)

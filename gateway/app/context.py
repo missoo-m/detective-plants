@@ -1,13 +1,17 @@
+import logging
 from typing import Optional
 
 from fastapi import Header
 
 from . import clients
-from .errors import AuthenticationError
+from .errors import AuthenticationError, ServiceUnavailableError
+
+
+log = logging.getLogger("context")
 
 
 def build_context(authorization: Optional[str]) -> dict:
-    context = {"identity": None, "current_user_id": None, "token": None, "auth_error": None}
+    context = {"identity": None, "current_user_id": None, "token": None, "auth_error": None, "auth_unavailable": None}
     if not authorization:
         return context
     scheme, _, token = authorization.partition(" ")
@@ -18,7 +22,11 @@ def build_context(authorization: Optional[str]) -> dict:
     try:
         identity = clients.security_client.verify(context["token"])
     except AuthenticationError as error:
-        context["auth_error"] = error.message        
+        context["auth_error"] = error.message
+        return context
+    except ServiceUnavailableError as error:
+        log.error("Проверка токена не выполнена: %s", error.message)
+        context["auth_unavailable"] = error
         return context
     context["identity"], context["current_user_id"] = identity, identity.user_id
     return context

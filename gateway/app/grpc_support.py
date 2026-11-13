@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import random
 import threading
 import time
 from typing import Any, Callable, Optional
@@ -9,10 +10,11 @@ import grpc
 from . import config
 from .errors import (AuthenticationError, BusinessRuleError, DomainError, NotFoundError, PermissionDeniedError,
                      ServiceUnavailableError, ValidationError)
+from .logging_setup import CORRELATION_HEADER, correlation_id, remaining_budget
 
-log = logging.getLogger("grpc")
+log = logging.getLogger("rpc")
 
-MAX_MESSAGE_BYTES = 8 * 1024 * 1024                  
+MAX_MESSAGE_BYTES = 8 * 1024 * 1024
 CHANNEL_OPTIONS = [("grpc.max_send_message_length", MAX_MESSAGE_BYTES),
                    ("grpc.max_receive_message_length", MAX_MESSAGE_BYTES)]
 API_KEY_HEADER = "x-internal-key"
@@ -22,11 +24,14 @@ CLIENT_ERRORS = {grpc.StatusCode.NOT_FOUND: NotFoundError, grpc.StatusCode.INVAL
                  grpc.StatusCode.FAILED_PRECONDITION: BusinessRuleError,
                  grpc.StatusCode.UNAUTHENTICATED: AuthenticationError,
                  grpc.StatusCode.UNAVAILABLE: ServiceUnavailableError,
-                 grpc.StatusCode.DEADLINE_EXCEEDED: ServiceUnavailableError}
-RETRYABLE = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED}
+                 grpc.StatusCode.DEADLINE_EXCEEDED: ServiceUnavailableError,
+                 grpc.StatusCode.RESOURCE_EXHAUSTED: ServiceUnavailableError}
+RETRYABLE = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED, grpc.StatusCode.RESOURCE_EXHAUSTED}
+BUSINESS_CODES = {code.name for code in (grpc.StatusCode.NOT_FOUND, grpc.StatusCode.INVALID_ARGUMENT,
+                                         grpc.StatusCode.PERMISSION_DENIED, grpc.StatusCode.FAILED_PRECONDITION,
+                                         grpc.StatusCode.UNAUTHENTICATED)}
 
 
-# protobuf ↔ Python
 def _is_repeated(field) -> bool:
     flag = getattr(field, "is_repeated", None)
     return bool(flag) if flag is not None else field.label == field.LABEL_REPEATED
@@ -43,7 +48,7 @@ def _is_map(field) -> bool:
 def _has_value(msg, field) -> bool:
     try:
         return msg.HasField(field.name)
-    except ValueError:                                  
+    except ValueError:
         return True
 
 
@@ -99,7 +104,6 @@ def to_message(message_cls, data: Any):
     return msg
 
 
-# клиент
 class CircuitBreaker:
 
     def __init__(self, threshold: int = 5, reset_seconds: float = 10.0, clock: Callable[[], float] = time.monotonic):
@@ -112,7 +116,7 @@ class CircuitBreaker:
             if self._opened_at is None:
                 return True
             if self._clock() - self._opened_at >= self._reset:
-                self._opened_at = None                 
+                self._opened_at = None
                 self._failures = self._threshold - 1
                 return True
             return False
@@ -137,42 +141,87 @@ def to_service_error(error: "grpc.RpcError") -> DomainError:
     return kind(details or code.name)
 
 
+class RetryPolicy:
+
+    def __init__(self, max_retries: Optional[int] = None, base_delay: Optional[float] = None,
+                 max_delay: Optional[float] = None, rng: Callable[[float, float], float] = random.uniform):
+        self.max_retries = config.GRPC_RETRIES if max_retries is None else max_retries
+        self.base_delay = config.GRPC_BACKOFF_BASE if base_delay is None else base_delay
+        self.max_delay = config.GRPC_BACKOFF_MAX if max_delay is None else max_delay
+        self._rng = rng
+
+    def delay(self, attempt: int) -> float:
+        return min(self.max_delay, self.base_delay * 2 ** (attempt - 1)) * self._rng(0.5, 1.0)
+
+
+def rpc_name(method) -> str:
+    raw = getattr(method, "_method", None)
+    return raw.decode() if isinstance(raw, bytes) else str(raw or getattr(method, "__name__", "?"))
+
+
 class ServiceChannel:
 
     def __init__(self, target: str, name: str, timeout: Optional[float] = None, api_key: Optional[str] = None,
-                 retries: int = 2, breaker: Optional[CircuitBreaker] = None, sleep: Callable[[float], None] = time.sleep,
-                 channel=None):
+                 retries: Optional[int] = None, breaker: Optional[CircuitBreaker] = None,
+                 sleep: Callable[[float], None] = time.sleep, channel=None, policy: Optional[RetryPolicy] = None):
         self.name, self.target = name, target
         self._timeout = timeout or config.GRPC_TIMEOUT_SECONDS
-        self._metadata = ((API_KEY_HEADER, api_key if api_key is not None else config.INTERNAL_API_KEY),)
-        self._retries, self._sleep = retries, sleep
+        self._key = api_key if api_key is not None else config.INTERNAL_API_KEY
+        self._policy = policy or RetryPolicy(max_retries=retries)
+        self._sleep = sleep
         self._breaker = breaker or CircuitBreaker()
         self._channel = channel or grpc.insecure_channel(target, options=CHANNEL_OPTIONS)
 
     def stub(self, stub_cls):
         return stub_cls(self._channel)
 
+    def _metadata(self) -> tuple:
+        return ((API_KEY_HEADER, self._key), (CORRELATION_HEADER, correlation_id.get()))
+
+    def _attempt_timeout(self) -> float:
+        left = remaining_budget()
+        if left is None:
+            return self._timeout
+        if left <= 0.05:
+            raise ServiceUnavailableError("Время выполнения операции исчерпано, вызов не выполнялся")
+        return min(self._timeout, left - 0.02)
+
     def call(self, method: Callable, request, idempotent: bool = False):
+        label = f"{self.name}.{rpc_name(method).rsplit('/', 1)[-1]}"
         if not self._breaker.allow():
+            log.warning("→ %s отклонён предохранителем (сервис недоступен)", label)
             raise ServiceUnavailableError(f"Сервис {self.name} временно недоступен (повторите попытку позже)")
-        attempts = 1 + (self._retries if idempotent else 0)
+        attempts = 1 + (self._policy.max_retries if idempotent else 0)
+        started = time.monotonic()
         for attempt in range(1, attempts + 1):
             try:
-                response = method(request, timeout=self._timeout, metadata=self._metadata)
+                response = method(request, timeout=self._attempt_timeout(), metadata=self._metadata())
                 self._breaker.success()
+                log.info("gRPC → %s OK %.0f мс%s", label, (time.monotonic() - started) * 1000,
+                         f" (попытка {attempt})" if attempt > 1 else "")
                 return response
             except grpc.RpcError as error:
                 code = error.code() if hasattr(error, "code") else None
                 if code in RETRYABLE:
                     self._breaker.failure()
                     if attempt < attempts:
-                        log.warning("%s: %s, повтор %s/%s", self.name, code.name, attempt, attempts - 1)
-                        self._sleep(0.2 * attempt)
-                        continue
+                        pause = self._policy.delay(attempt)
+                        left = remaining_budget()
+                        if left is None or left > pause + 0.1:
+                            log.warning("gRPC → %s: %s, повтор %s/%s через %.2f с", label, code.name, attempt,
+                                        attempts - 1, pause)
+                            self._sleep(pause)
+                            continue
+                        log.warning("gRPC → %s: %s, повтор невозможен — исчерпан бюджет времени операции", label,
+                                    code.name)
                 else:
-                    self._breaker.success()           
-                raise to_service_error(error) from None
-        raise ServiceUnavailableError(f"Сервис {self.name} не ответил")     
+                    self._breaker.success()
+                failure = to_service_error(error)
+                log.log(logging.ERROR if isinstance(failure, ServiceUnavailableError) else logging.WARNING,
+                        "gRPC → %s %s за %.0f мс: %s", label, code.name if code else "ERROR",
+                        (time.monotonic() - started) * 1000, failure)
+                raise failure from None
+        raise ServiceUnavailableError(f"Сервис {self.name} не ответил")
 
     def close(self) -> None:
         self._channel.close()

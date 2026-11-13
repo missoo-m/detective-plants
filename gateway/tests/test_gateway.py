@@ -107,7 +107,7 @@ def test_full_diagnosis_scenario():
     assert ok(f'mutation {{ selectExpert(requestId: "{rid}", expertId: "user-2") {{ status }} }}', user="user-4")["selectExpert"]["status"] == "PENDING"
 
     fails(f'mutation {{ createDiagnosis(input: {{requestId: "{rid}", diseaseId: "dis-1", description: "Мучнистая роса"}}) {{ id }} }}',
-          "BUSINESS_RULE_VIOLATION", user="user-2")                         # до оплаты диагноз ставить нельзя
+          "BUSINESS_RULE_VIOLATION", user="user-2")
     pay = f'mutation {{ createPayment(input: {{requestId: "{rid}", idempotencyKey: "key-12345678"}}) {{ id amount status }} }}'
     first = ok(pay, user="user-4")["createPayment"]
     assert first["amount"] == 25.0 and ok(pay, user="user-4")["createPayment"]["id"] == first["id"]
@@ -133,14 +133,14 @@ def test_request_rules():
     fails('mutation { selectExpert(requestId: "req-1", expertId: "user-2") { id } }', "FORBIDDEN", user="user-4")
     assert ok('mutation { cancelRequest(requestId: "req-1") { status } }')["cancelRequest"]["status"] == "CANCELLED"
     fails('mutation { cancelRequest(requestId: "req-1") { id } }', "BUSINESS_RULE_VIOLATION")
-    fails('mutation { cancelRequest(requestId: "req-2") { id } }', "BUSINESS_RULE_VIOLATION")    
+    fails('mutation { cancelRequest(requestId: "req-2") { id } }', "BUSINESS_RULE_VIOLATION")
     fails('mutation { cancelRequest(requestId: "req-999") { id } }', "NOT_FOUND")
 
 
 def test_active_requests_limit():
     ok('mutation { createRequest(input: {symptoms: "Третья активная заявка клиента"}) { id } }')
     fails('mutation { createRequest(input: {symptoms: "Лишняя активная заявка"}) { id } }', "BUSINESS_RULE_VIOLATION")
-    ok('mutation { cancelRequest(requestId: "req-1") { id } }')                       
+    ok('mutation { cancelRequest(requestId: "req-1") { id } }')
     ok('mutation { createRequest(input: {symptoms: "Заявка вместо отменённой"}) { id } }')
     fails('mutation { createRequest(input: {symptoms: "Снова лишняя заявка"}) { id } }', "BUSINESS_RULE_VIOLATION")
 
@@ -161,7 +161,7 @@ def test_chat_and_notifications():
     msg = ok('mutation { sendMessage(input: {chatRoomId: "chat-1", text: "Добрый день"}) { id isRead } }')["sendMessage"]
     fails('mutation { sendMessage(input: {chatRoomId: "chat-1", text: "Я посторонний"}) { id } }', "FORBIDDEN", user="user-4")
     fails('mutation { sendMessage(input: {chatRoomId: "chat-1", text: "  "}) { id } }', "BAD_USER_INPUT")
-    fails(f'mutation {{ markMessageRead(messageId: "{msg["id"]}") {{ id }} }}', "BUSINESS_RULE_VIOLATION")      # автор
+    fails(f'mutation {{ markMessageRead(messageId: "{msg["id"]}") {{ id }} }}', "BUSINESS_RULE_VIOLATION")
     assert ok(f'mutation {{ markMessageRead(messageId: "{msg["id"]}") {{ isRead }} }}', user="user-2")["markMessageRead"]["isRead"]
     assert ok('mutation { createVideoRoom(chatRoomId: "chat-1") { status } }', user="user-2")["createVideoRoom"]["status"] == "CREATED"
     fails('mutation { createVideoRoom(chatRoomId: "chat-1") { id } }', "BUSINESS_RULE_VIOLATION", user="user-2")
@@ -186,7 +186,7 @@ def test_expert_verification_and_blocking():
     fails(f'mutation {{ verifyExpert(applicationId: "{app["id"]}", approve: true) {{ id }} }}', "FORBIDDEN")
     res = ok(f'mutation {{ verifyExpert(applicationId: "{app["id"]}", approve: true) {{ status }} }}', user="user-3")
     assert res["verifyExpert"]["status"] == "APPROVED"
-    assert ok("{ me { role } }")["me"]["role"] == "EXPERT"                
+    assert ok("{ me { role } }")["me"]["role"] == "EXPERT"
     assert ok('mutation { blockUser(userId: "user-4") { status } }', user="user-3")["blockUser"]["status"] == "BLOCKED"
     fails('mutation { blockUser(userId: "user-4") { id } }', "BUSINESS_RULE_VIOLATION", user="user-3")
     fails('mutation { blockUser(userId: "user-3") { id } }', "BUSINESS_RULE_VIOLATION", user="user-3")

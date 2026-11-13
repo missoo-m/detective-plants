@@ -14,7 +14,7 @@ MOCK_EXPERT_APPLICATIONS = {
 
 
 class MockAdminClient(AdminClientBase):
-    
+
     def __init__(self):
         self.applications = copy.deepcopy(MOCK_EXPERT_APPLICATIONS)
 
@@ -24,7 +24,7 @@ class MockAdminClient(AdminClientBase):
         return clients.auth_client
 
     def _require_admin(self, admin_id: str, actor_role: Optional[str] = None) -> None:
-        if actor_role is not None:                      
+        if actor_role is not None:
             if actor_role != "ADMIN":
                 raise PermissionDeniedError("Действие доступно только администратору")
             return
@@ -91,5 +91,5 @@ class MockAdminClient(AdminClientBase):
             raise BusinessRuleError("Пользователь уже заблокирован")
         self._auth().set_status(user_id, "BLOCKED")
         from app import clients
-        clients.security_client.revoke_user_sessions(user_id)        
+        clients.security_client.revoke_user_sessions(user_id)
         return {"user_id": user_id, "status": "BLOCKED"}
